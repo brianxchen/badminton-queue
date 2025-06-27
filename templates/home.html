@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="timer-display" id="timer">15:00</div>
+
+<div class="courts-grid">
+    {% for court_name, court_data in courts.items() %}
+    <div class="court-section" id="{{ court_name|replace(' ', '-') }}">
+        <h2>{{ court_name }}</h2>
+        <div class="players-list">
+            <h3>Current Players</h3>
+            <ul class="current-players">
+                {% for player in court_data.players %}
+                <li>
+                    <span class="player-name">{{ player }}</span>
+                    {% if session.user == player %}
+                    <span class="player-indicator">You</span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="queue-list">
+            <h3>Queue</h3>
+            <ul class="queue">
+                {% for player in court_data.queue %}
+                <li>
+                    <span class="queue-number">{{ loop.index }}</span>
+                    <span class="player-name">{{ player }}</span>
+                    {% if session.user == player %}
+                    <span class="player-indicator">You</span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% if session.user %}
+        <div class="court-controls">
+            <form action="{{ url_for('join_court', court_name=court_name) }}" method="POST" class="inline-form">
+                <button type="submit" class="join-button" 
+                        {% if is_user_active_elsewhere(session.user) or 
+                              session.user in court_data.players or 
+                              session.user in court_data.queue or
+                              is_player_on_court(session.user) %}
+                        disabled
+                        {% endif %}>
+                    Join Court
+                </button>
+            </form>
+            
+            <form action="{{ url_for('join_queue', court_name=court_name) }}" method="POST" class="inline-form">
+                <button type="submit" class="join-button"
+                        {% if is_user_active_elsewhere(session.user) or 
+                              session.user in court_data.players or 
+                              session.user in court_data.queue or
+                              is_player_on_court(session.user) %}
+                        disabled
+                        {% endif %}>
+                    Join Queue
+                </button>
+            </form>
+            
+            {% if session.user in court_data.players or session.user in court_data.queue %}
+            <form action="{{ url_for('leave_court', court_name=court_name) }}" method="POST" class="inline-form">
+                <button type="submit" class="danger-button"
+                        {% if session.user in court_data.players and timer_state.is_running %}
+                        disabled
+                        {% endif %}>
+                    Leave
+                </button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateTimerDisplay() {
+    fetch('/timer/status')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('timer').textContent = formatTime(data.remaining);
+            updateCourtsDisplay(data.courts);
+        });
+}
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+setInterval(updateTimerDisplay, 1000);
+</script>
+{% endblock %}

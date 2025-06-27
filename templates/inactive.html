@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="inactive-message">
+    <h1>Columbia Badminton Club</h1>
+    <p>Club has not started yet!</p>
+    {% if not session.user %}
+    <div class="login-prompt">
+        <a href="{{ url_for('login') }}" class="login-button">Admin Login</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Columbia Badminton Club</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+</head>
+<body>
+    <div class="container">
+        <nav class="navigation-bar">
+            <div class="nav-title">Columbia Badminton Club</div>
+            <div class="nav-actions">
+                {% if session.user %}
+                    <div class="user-indicator">
+                        Signed in as: <span class="username">{{ session.user }}</span>
+                    </div>
+                    <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+                    <a href="{{ url_for('logout') }}" class="nav-button">Sign Out</a>
+                {% else %}
+                    <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
+                    <a href="{{ url_for('login') }}" class="nav-button">Sign In</a>
+                {% endif %}
+            </div>
+        </nav>
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='theme.js') }}"></script>
+    <script>
+        window.currentUser = "{{ session.user if session.user else '' }}";
+    </script>
+    <script src="{{ url_for('static', filename='live-updates.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', initLiveUpdates);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

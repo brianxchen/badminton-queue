@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel - Badminton Club</title>
+    <style>
+        .court-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        .timer-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .timer-display {
+            font-size: 2em;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .timer-controls button {
+            margin: 0 5px;
+            padding: 5px 15px;
+        }
+        .danger-button {
+            background-color: #ff4444;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .status-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .status-button.active {
+            background-color: #4caf50;
+            color: white;
+        }
+        .status-button.inactive {
+            background-color: #f44336;
+            color: white;
+        }
+        .status-text {
+            margin-top: 10px;
+            font-size: 1em;
+        }
+        .user-management {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+        }
+        .user-form .form-group {
+            display: flex;
+            gap: 10px;
+        }
+        .user-list {
+            margin-top: 20px;
+        }
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .inline-form {
+            display: inline;
+        }
+        .add-button, .remove-button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-button {
+            background-color: #4caf50;
+            color: white;
+        }
+        .remove-button {
+            background-color: #f44336;
+            color: white;
+        }
+        .flash-message {
+            background-color: #ffeb3b;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Admin Panel</h1>
+    <a href="{{ url_for('home') }}">Back to Home</a>
+
+    <div class="timer-section">
+        <h2>Court Timer</h2>
+        <div class="timer-display" id="timer">15:00</div>
+        <div class="timer-controls">
+            <div class="form-group">
+                <label for="timerDuration">Set Time (minutes):</label>
+                <input type="number" 
+                       id="timerDuration" 
+                       min="0.5" 
+                       max="60" 
+                       value="15" 
+                       step="0.1">
+                <button onclick="setDuration()">Set</button>
+            </div>
+            <button onclick="startTimer()">Start</button>
+            <button onclick="stopTimer()">Stop</button>
+            <button onclick="resetTimer()">Reset</button>
+        </div>
+    </div>
+
+    <div class="admin-controls">
+        <div class="club-status-control">
+            <h2>Club Status</h2>
+            <button id="clubStatusToggle" 
+                    class="status-button"
+                    data-status="{{ 'deactivate' if club_state.is_active else 'activate' }}"
+                    onclick="confirmToggleStatus()">
+                {% if club_state.is_active %}
+                Deactivate Club
+                {% else %}
+                Activate Club
+                {% endif %}
+            </button>
+        </div>
+        
+        <button onclick="clearCourts()" class="danger-button">Clear All Courts</button>
+    </div>
+
+    {% for court_name, court_data in courts.items() %}
+    <div class="court-section">
+        <h2>{{ court_name }}</h2>
+        <p><strong>Current Players:</strong> {{ court_data.players|join(', ') }}</p>
+        <p><strong>Queue:</strong> {{ court_data.queue|join(', ') }}</p>
+        
+        <form method="POST">
+            <input type="hidden" name="court" value="{{ court_name }}">
+            <div class="form-group">
+                <label for="target_user">Username:</label>
+                <input type="text" name="target_user" id="target_user" required>
+            </div>
+            <div class="form-group">
+                <input type="submit" name="action" value="add">
+                <input type="submit" name="action" value="remove">
+            </div>
+        </form>
+    </div>
+    {% endfor %}
+
+    <div class="user-management">
+        <h2>User Management</h2>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                <div class="flash-message">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form action="{{ url_for('add_user') }}" method="POST" class="user-form">
+            <div class="form-group">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit" class="add-button">Add User</button>
+            </div>
+        </form>
+
+        <div class="user-list">
+            {% for username, user_data in users.items() %}
+            {% if not user_data.is_admin %}
+            <div class="user-item">
+                <span class="username">{{ username }}</span>
+                <form action="{{ url_for('remove_user') }}" method="POST" class="inline-form">
+                    <input type="hidden" name="username" value="{{ username }}">
+                    <button type="submit" class="remove-button">Remove</button>
+                </form>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        let timerInterval;
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.round(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function updateTimerDisplay() {
+            try {
+                const response = await fetch('/timer/status');
+                const data = await response.json();
+                document.getElementById('timer').textContent = formatTime(data.remaining);
+                
+                if (!data.running && timerInterval && data.remaining <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            } catch (error) {
+                console.error('Error updating timer:', error);
+            }
+        }
+
+        async function setDuration() {
+            const minutes = parseFloat(document.getElementById('timerDuration').value);
+            if (isNaN(minutes) || minutes < 0 || minutes > 60) {
+                alert('Please enter a valid time between 0.5 and 60 minutes');
+                return;
+            }
+
+            try {
+                const response = await fetch('/timer/set-duration', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() if csrf_token else "" }}'
+                    },
+                    body: JSON.stringify({ minutes: minutes })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Update the display immediately
+                    document.getElementById('timer').textContent = formatTime(data.duration);
+                } else {
+                    const error = await response.json();
+                    alert(error.error || 'Failed to set duration');
+                }
+            } catch (error) {
+                console.error('Error setting duration:', error);
+                alert('Failed to set duration');
+            }
+        }
+
+        async function startTimer() {
+            try {
+                const response = await fetch('/timer/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (!timerInterval) {
+                        timerInterval = setInterval(updateTimerDisplay, 1000);
+                    }
+                    // Force immediate update
+                    updateTimerDisplay();
+                } else {
+                    console.error('Failed to start timer');
+                }
+            } catch (error) {
+                console.error('Error starting timer:', error);
+            }
+        }
+
+        async function stopTimer() {
+            try {
+                const response = await fetch('/timer/stop', { method: 'POST' });
+                if (response.ok) {
+                    updateTimerDisplay();
+                }
+            } catch (error) {
+                console.error('Error stopping timer:', error);
+            }
+        }
+
+        async function resetTimer() {
+            try {
+                const response = await fetch('/timer/reset', { method: 'POST' });
+                if (response.ok) {
+                    updateTimerDisplay();
+                }
+            } catch (error) {
+                console.error('Error resetting timer:', error);
+            }
+        }
+
+        async function clearCourts() {
+            if (!confirm('Are you sure you want to clear all courts? This will remove all players.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/clear-courts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to clear courts');
+                }
+            } catch (error) {
+                console.error('Error clearing courts:', error);
+                alert('Failed to clear courts');
+            }
+        }
+
+        async function updateClubStatus() {
+            try {
+                const response = await fetch('/club-status');
+                const data = await response.json();
+                
+                const button = document.getElementById('clubStatusToggle');
+                const indicator = document.getElementById('statusIndicator');
+                
+                button.textContent = data.is_active ? '💀 Deactivate Club 💀' : '🏸 Activate Club 🏸';
+                button.className = `status-button ${data.is_active ? 'active' : 'inactive'}`;
+                indicator.textContent = data.is_active ? 'Club is currently active' : 'Club is currently inactive';
+            } catch (error) {
+                console.error('Error fetching club status:', error);
+            }
+        }
+
+        async function toggleClubStatus() {
+            try {
+                const response = await fetch('/toggle-club-status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const button = document.getElementById('clubStatusToggle');
+                    
+                    // Update button text and status
+                    button.textContent = data.is_active ? 'Deactivate Club' : 'Activate Club';
+                    button.setAttribute('data-status', data.is_active ? 'deactivate' : 'activate');
+                    
+                    // Show confirmation message
+                    const message = data.is_active ? 
+                        'Club is now active. Members can join courts.' : 
+                        'Club is now inactive. Members cannot access the system.';
+                    alert(message);
+                }
+            } catch (error) {
+                console.error('Error toggling club status:', error);
+                alert('Failed to toggle club status');
+            }
+        }
+
+        function confirmToggleStatus() {
+            const isCurrentlyActive = document.getElementById('clubStatusToggle').textContent.includes('Deactivate');
+            const message = isCurrentlyActive ?
+                'Are you sure you want to deactivate the club? This will prevent members from accessing courts.' :
+                'Are you sure you want to activate the club? This will allow members to join courts.';
+            
+            if (confirm(message)) {
+                toggleClubStatus();
+            }
+        }
+
+        // Initial timer update and start interval
+        updateTimerDisplay();
+        setInterval(updateTimerDisplay, 1000);
+
+        // Update club status immediately and every 30 seconds
+        updateClubStatus();
+        setInterval(updateClubStatus, 30000);
+    </script>
+</body>
+</html>
+{% endblock %}
