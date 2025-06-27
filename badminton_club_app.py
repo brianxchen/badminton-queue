@@ -3,6 +3,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import timedelta, datetime
 import time
 import json
+import random
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -73,6 +74,14 @@ def rotate_players(court):
         next_player = court['queue'].pop(0)  # Remove from front of queue
         court['players'].append(next_player)  # Add to players
 
+def get_random_signature():
+    signatures = [
+        "❤️", "💻", "☕️", "🍞🥛", "🧸🍯", "🌼🍄", "🌙📖", "🧠🔧", 
+        "🦾📟", "👨‍💻⌨️", "🕹️💡", "🎨🧵", "✏️📐", "🪄🖋️", "🐥🐾",
+        "🦊🌰", "🐝🌻", "🐈‍⬛🧶", "🔥🧃", "🧂🥲", "🥴⚙️", "👻🍕"
+    ]
+    return random.choice(signatures)
+
 @app.context_processor
 def inject_constants():
     return dict(MAX_PLAYERS=MAX_PLAYERS)
@@ -84,7 +93,8 @@ def inject_utilities():
         'is_user_active_elsewhere': is_user_active_elsewhere,
         'club_state': club_state,
         'is_player_on_court': is_player_on_court,
-        'timer_state': timer_state
+        'timer_state': timer_state,
+        'signature': get_random_signature()
     }
 
 @app.route('/')

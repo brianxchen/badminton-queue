@@ -412,3 +412,29 @@ button:disabled {
     font-size: 15px;
     text-align: center;
 }
+
+.footer {
+    text-align: center;
+    padding: 24px 0;
+    margin-top: 40px;
+    color: var(--text-secondary);
+    font-size: 15px;
+    font-weight: 500;
+    border-top: 1px solid var(--border-color);
+}
+
+.footer p {
+    margin: 0;
+}
+
+.heart {
+    color: var(--system-red);
+    display: inline-block;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}

@@ -26,6 +26,10 @@
         </nav>
 
         {% block content %}{% endblock %}
+        
+        <footer class="footer">
+            <p>Made with {{ signature }} by Brian</p>
+        </footer>
     </div>
 
     <script src="{{ url_for('static', filename='theme.js') }}"></script>
