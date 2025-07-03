@@ -9,9 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv('SECRET_KEY') # this secret key thing aint working
 app = Flask(__name__)
-app.secret_key = SECRET_KEY
+# print(f"SECRET_KEY: {SECRET_KEY}")  # Debugging line to check if SECRET_KEY is loaded
+app.secret_key = SECRET_KEY  # Change this to a secure key in production
 app.permanent_session_lifetime = timedelta(hours=4)
 
 # In-memory storage (replace with a database in production)
