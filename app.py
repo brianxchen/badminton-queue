@@ -5,42 +5,34 @@ import time
 import json
 import random
 
+# Flask alchemy for database
+from flask_sqlalchemy import SQLAlchemy
+
 from dotenv import load_dotenv
 load_dotenv()
 
 import os
-SECRET_KEY = os.getenv('SECRET_KEY') # this secret key thing aint working
+SECRET_KEY = os.getenv('SECRET_KEY')
 app = Flask(__name__)
 # print(f"SECRET_KEY: {SECRET_KEY}")  # Debugging line to check if SECRET_KEY is loaded
 app.secret_key = SECRET_KEY  # Change this to a secure key in production
 app.permanent_session_lifetime = timedelta(hours=4)
 
-# In-memory storage (replace with a database in production)
-users = {
-    'admin': {
-        'password': generate_password_hash('adminpass'),  # Change this password!
-        'is_admin': True,
-        'is_checked_in': True
-    },
+# Database config
+DATABASE_URL = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # temp create some users
-    'a':{
-        'password': generate_password_hash('a'),
-        'is_admin': False
-    },
-    'b':{
-        'password': generate_password_hash('b'),
-        'is_admin': False
-    },
-    'c':{
-        'password': generate_password_hash('c'),
-        'is_admin': False
-    },
-    'd':{
-        'password': generate_password_hash('d'),
-        'is_admin': False
-    }
-}
+db = SQLAlchemy(app)
+
+# User model for database
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    is_checked_in = db.Column(db.Boolean, default=False)
+
 courts = {f'Court {i}': {'players': [], 'queue': []} for i in range(1, 5)}  # 4 courts
 
 timer_state = {
@@ -107,30 +99,42 @@ def home():
     is_admin = users.get(session.get('user'), {}).get('is_admin', False)
     return render_template('home.html', courts=courts, logged_in=logged_in, username=session.get('user'), is_admin=is_admin)
 
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = users.get(username)
-        if user and check_password_hash(user['password'], password):
-            session.permanent = True
-            session['user'] = username
-            # Redirect to admin panel if user is admin, otherwise go to home
-            if user.get('is_admin', False):
-                return redirect(url_for('admin'))
+        # app.logger.info("Login attempt")
+        _username = request.form['username']
+        _password = request.form['password']
+
+        user = User.query.filter_by(username=_username).first()
+        if user and check_password_hash(user.password_hash, _password):
+            session['user'] = user.username
             return redirect(url_for('home'))
-        return render_template('login.html', error='Invalid credentials')
+        else:
+            flash('Invalid username or password')
+            return render_template('login.html', error='Invalid credentials')
     return render_template('login.html')
+
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
         username = request.form['username']
-        password = generate_password_hash(request.form['password'])
-        if username in users:
-            return 'Username already exists', 400
-        users[username] = {'password': password, 'is_admin': False}
+        password = request.form['password']
+        
+        # Check if username already exists
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            flash('Username already exists')
+            return render_template('signup.html', error='Username already exists')
+        password_hash = generate_password_hash(password)
+        new_user = User(username=username, password_hash=password_hash, is_admin=False)
+        db.session.add(new_user)
+        db.session.commit()
+
+        flash('User created successfully! Please log in.')
         return redirect(url_for('login'))
     return render_template('signup.html')
 
@@ -414,4 +418,4 @@ def court_updates():
     return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5001, debug=True)
