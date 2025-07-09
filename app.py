@@ -334,60 +334,6 @@ def admin():
                          courts=courts,
                          users=users)  # Pass users to the template
 
-@app.route('/admin/add_user', methods=['GET', 'POST'])
-def add_user():
-    if 'user' not in session or not users.get(session['user'], {}).get('is_admin', False):
-        return redirect(url_for('login'))
-    
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        if not username or not password:
-            flash('Username and password are required')
-            return redirect(url_for('admin'))
-            
-        if username in users:
-            flash('User already exists')
-            return redirect(url_for('admin'))
-            
-        users[username] = {
-            'password': generate_password_hash(password),
-            'is_admin': False,
-            'is_checked_in': False
-        }
-        flash(f'User {username} added successfully')
-        
-    return redirect(url_for('admin'))
-
-@app.route('/admin/remove_user', methods=['GET', 'POST'])
-def remove_user():
-    if 'user' not in session or not users.get(session['user'], {}).get('is_admin', False):
-        return redirect(url_for('login'))
-    
-    if request.method == 'POST':
-        username = request.form.get('username')
-        
-        if username not in users:
-            flash('User does not exist')
-            return redirect(url_for('admin'))
-            
-        if users[username].get('is_admin'):
-            flash('Cannot remove admin user')
-            return redirect(url_for('admin'))
-            
-        # Remove user from courts and queues
-        for court in courts.values():
-            if username in court['players']:
-                court['players'].remove(username)
-            if username in court['queue']:
-                court['queue'].remove(username)
-                
-        del users[username]
-        flash(f'User {username} removed successfully')
-        
-    return redirect(url_for('admin'))
-
 @app.route('/timer/start', methods=['POST'])
 def start_timer():
     if 'user' not in session:
