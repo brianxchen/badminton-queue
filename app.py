@@ -643,6 +643,17 @@ if __name__ == '__main__':
             )
             db.session.add(admin)
             # print("Created admin user")
+                # Add test users a, b, c
+        test_users = ['a', 'b', 'c']
+        for username in test_users:
+            if not User.query.filter_by(username=username).first():
+                user = User(
+                    username=username,
+                    password_hash=generate_password_hash(username),  # password same as username
+                    is_admin=False
+                )
+                db.session.add(user)
+                print(f"Created test user: {username}")
 
         db.session.commit()
     app.run(host="0.0.0.0", port=5001, debug=True)
