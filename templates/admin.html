@@ -63,18 +63,6 @@
       None
     {% endif %}
   </p>
-
-  <form method="POST">
-    <input type="hidden" name="court" value="{{ court.name }}">
-    <div class="form-group">
-      <label for="target_user_{{ loop.index }}">Username:</label>
-      <input type="text" name="target_user" id="target_user_{{ loop.index }}" required>
-    </div>
-    <div class="form-group">
-      <input type="submit" name="action" value="add">
-      <input type="submit" name="action" value="remove">
-    </div>
-  </form>
 </div>
 {% endfor %}
 
