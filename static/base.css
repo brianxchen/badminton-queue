@@ -94,3 +94,16 @@ button[type="submit"] {
     margin: 0 auto;
     padding: 0 20px;
 }
+
+/* Flash message styles */
+.flash-message.success {
+    background-color: #4CAF50;
+}
+
+.flash-message.error {
+    background-color: #f44336;
+}
+
+.flash-message.warning {
+    background-color: #ff9800;
+}

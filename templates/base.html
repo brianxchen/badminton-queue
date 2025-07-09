@@ -6,8 +6,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <style>
+        .flash-messages {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .flash-message {
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            animation: fadeIn 0.5s, fadeOut 0.5s 2.5s;
+            opacity: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            color: white;
+        }
+
+        /* Different message types */
+        .flash-message.success {
+            background-color: #4CAF50;  /* Green */
+        }
+        
+        .flash-message.error {
+            background-color: #f44336;  /* Red */
+        }
+        
+        .flash-message.warning {
+            background-color: #ff9800;  /* Orange */
+        }
+
+        /* Default color if no category specified */
+        .flash-message.message {
+            background-color: #2196F3;  /* Blue */
+        }
+
+        @keyframes fadeIn {
+            from {opacity: 0; transform: translateX(50px);}
+            to {opacity: 1; transform: translateX(0);}
+        }
+
+        @keyframes fadeOut {
+            from {opacity: 1; transform: translateX(0);}
+            to {opacity: 0; transform: translateX(50px);}
+        }
+    </style>
 </head>
 <body>
+    <div class="flash-messages" id="flashMessages">
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="flash-message {{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+
     <div class="container">
         <nav class="navigation-bar">
             <div class="nav-title">Columbia Badminton Club</div>
@@ -39,6 +91,20 @@
     <script src="{{ url_for('static', filename='live-updates.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', initLiveUpdates);
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const messages = document.querySelectorAll('.flash-message');
+            messages.forEach(msg => {
+                msg.style.opacity = '1';
+                setTimeout(() => {
+                    msg.style.opacity = '0';
+                    setTimeout(() => {
+                        msg.remove();
+                    }, 500);
+                }, 3000);
+            });
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>

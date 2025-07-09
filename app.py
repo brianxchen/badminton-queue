@@ -183,7 +183,7 @@ def login():
             session['user'] = user.username
             return redirect(url_for('home'))
         else:
-            flash('Invalid username or password')
+            flash('Invalid username or password', 'error')
             return render_template('login.html', error='Invalid credentials')
     return render_template('login.html')
 
@@ -197,14 +197,14 @@ def signup():
         # Check if username already exists
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
-            flash('Username already exists')
+            flash('Username already exists', 'error')
             return render_template('signup.html', error='Username already exists')
         password_hash = generate_password_hash(password)
         new_user = User(username=username, password_hash=password_hash, is_admin=False)
         db.session.add(new_user)
         db.session.commit()
 
-        flash('User created successfully! Please log in.')
+        flash('User created successfully! Please log in.', 'success')
         return redirect(url_for('login'))
     return render_template('signup.html')
 
@@ -217,7 +217,7 @@ def logout():
 def join_court(court_name):
     username = session.get('user')
     if not username:
-        flash('You must be logged in to join a court')
+        flash('You must be logged in to join a court', 'error')
         return redirect(url_for('login'))
 
     user = User.query.filter_by(username=username).first()
@@ -228,13 +228,13 @@ def join_court(court_name):
             if not user.court:  # Already handled by FK
                 user.court = court
                 db.session.commit()
-                flash(f'You joined {court.name}')
+                flash(f'You joined {court.name}', 'success')
             else:
-                flash('You are already on a court.')
+                flash('You are already on a court.', 'error')
         else:
-            flash('You are already active elsewhere.')
+            flash('You are already active elsewhere.', 'error')
     else:
-        flash('Court is full or does not exist.')
+        flash('Court is full or does not exist.', 'error')
 
     return redirect(url_for('home'))
 
@@ -242,7 +242,7 @@ def join_court(court_name):
 def join_queue(court_name):
     username = session.get('user')
     if not username:
-        flash('You must be logged in to join a queue')
+        flash('You must be logged in to join a queue', 'error')
         return redirect(url_for('login'))
 
     user = User.query.filter_by(username=username).first()
@@ -257,13 +257,13 @@ def join_queue(court_name):
                 new_entry = QueueEntry(court=court, user=user, position=next_position)
                 db.session.add(new_entry)
                 db.session.commit()
-                flash(f'You joined the queue for {court.name}')
+                flash(f'You joined the queue for {court.name}', 'success')
             else:
-                flash('You are already on a court.')
+                flash('You are already on a court.', 'error')
         else:
-            flash('You are already active elsewhere.')
+            flash('You are already active elsewhere.', 'error')
     else:
-        flash('You are already in a queue or court does not exist.')
+        flash('You are already in a queue or court does not exist.', 'error')
 
     return redirect(url_for('home'))
 
@@ -308,7 +308,7 @@ def leave_court(court_name):
                 for i, entry in enumerate(court.queue[1:], 1):
                     entry.position = i
         else:
-            flash('Cannot leave court while timer is running')
+            flash('Cannot leave court while timer is running', 'error')
 
     if did_something:
         db.session.commit()
@@ -328,7 +328,7 @@ def admin():
     if not user or not user.is_admin:
 
         # optional: don't even give this warning, just redirect to home immediately?
-        flash('You do not have permission to access the admin page')
+        flash('You do not have permission to access the admin page', 'error')
         return redirect(url_for('home'))
     return render_template('admin.html', 
                          courts=courts,
