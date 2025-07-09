@@ -116,14 +116,6 @@ def is_player_on_court(user):
         return False
     return user.court is not None
 
-
-def rotate_players(court):
-    """Helper function to move players from queue to court"""
-    # Move players from queue to court
-    while len(court['players']) < MAX_PLAYERS and court['queue']:
-        next_player = court['queue'].pop(0)  # Remove from front of queue
-        court['players'].append(next_player)  # Add to players
-
 def get_random_signature():
     signatures = [
         "❤️", "💻", "☕️", "🍞🥛", "🧸🍯", "🌼🍄", "🌙📖", "🧠🔧", 
@@ -303,17 +295,20 @@ def leave_court(court_name):
                 entry.position = i
 
     # Leave court if they’re on this court and timer is not running
-    if user.court == court and not timer_state.is_running:
-        user.court = None
-        did_something = True
+    if user.court == court:
+        if not timer_state.is_running:
+            user.court = None
+            did_something = True
 
-        # Promote next players from queue
-        while len(court.players) < MAX_PLAYERS and court.queue:
-            next_entry = court.queue[0]
-            next_entry.user.court = court
-            db.session.delete(next_entry)
-            for i, entry in enumerate(court.queue[1:], 1):
-                entry.position = i
+            # Promote next players from queue
+            while len(court.players) < MAX_PLAYERS and court.queue:
+                next_entry = court.queue[0]
+                next_entry.user.court = court
+                db.session.delete(next_entry)
+                for i, entry in enumerate(court.queue[1:], 1):
+                    entry.position = i
+        else:
+            flash('Cannot leave court while timer is running')
 
     if did_something:
         db.session.commit()
@@ -420,61 +415,73 @@ def start_timer():
         'remaining': timer_state.remaining_time,
         'end_time': timer_state.end_time
     })
-
 @app.route('/timer/status')
 def get_timer_status():
     timer_state = TimerState.query.first()
     courts = Court.query.all()
-    
-    if timer_state.is_running and timer_state.start_time is not None:
+
+    if timer_state and timer_state.is_running and timer_state.start_time is not None:
         now = datetime.now().timestamp()
         elapsed = now - timer_state.start_time
         remaining = max(0, timer_state.remaining_time - elapsed)
-        
-        if remaining <= 0:
-            # Timer expired - rotate players
+
+        if remaining <= 0.1:
+            app.logger.info("⏰ Timer expired — rotating players!")
+
+            # Mark timer as stopped
             timer_state.is_running = False
             timer_state.remaining_time = 0
-            timer_state.end_time = None
             timer_state.start_time = None
-            
-            # Clear courts and rotate in queued players
+            timer_state.end_time = None
+
+            # Clear players safely
             for court in courts:
-                # Clear current players
-                for user in court.players:
-                    user.court = None
-                
-                # Move players from queue to court
+                for player in court.players[:]:
+                    player.court = None
+
+            db.session.flush()
+
+            for court in courts:
+                print(f"Checking court {court.name} for players and queue")
                 while len(court.players) < MAX_PLAYERS and court.queue:
+                    print(f"queue currently: {[entry.user.username for entry in court.queue]}")
                     next_entry = court.queue[0]
-                    next_entry.user.court = court
-                    db.session.delete(next_entry)
-                    # Reorder remaining queue entries
+                    print(f"Promoting {next_entry.user.username} to court {court.name}")
+                    court.players.append(next_entry.user)  # Add to players
+                    court.queue = court.queue[1:]  # Remove from queue
+                    db.session.delete(next_entry)  # Remove from queue
                     for i, entry in enumerate(court.queue[1:], 1):
                         entry.position = i
-            
+
             db.session.commit()
-            
+
             return jsonify({
                 'running': False,
                 'remaining': 0,
                 'expired': True,
                 'courts': [court.to_dict() for court in courts]
             })
-        
+
         return jsonify({
             'running': True,
             'remaining': int(remaining),
             'expired': False,
             'courts': [court.to_dict() for court in courts]
         })
-    
+
+    # When timer not running, always reset to default time!
+    if timer_state and not timer_state.is_running and timer_state.remaining_time == 0:
+        DEFAULT_DURATION = 900  # 15 min
+        timer_state.remaining_time = DEFAULT_DURATION
+        db.session.commit()
+
     return jsonify({
         'running': False,
-        'remaining': int(timer_state.remaining_time),
+        'remaining': int(timer_state.remaining_time) if timer_state else 0,
         'expired': False,
         'courts': [court.to_dict() for court in courts]
     })
+
 
 @app.route('/timer/reset', methods=['POST'])
 def reset_timer():
