@@ -278,6 +278,9 @@ class CourtManager {
                 }
             }
         }
+
+        // At the end of the method, after all DOM updates
+        this.reattachEventListeners();
     }
 
     shouldUpdateDisplay(groups, container) {
@@ -474,7 +477,70 @@ class CourtManager {
             clearInterval(this.pollingInterval);
         }
     }
+
+    generatePlayerSlotHTML(player, group) {
+        const isCurrentUser = player === window.currentUser;
+        return `
+            <div class="player-slot occupied ${isCurrentUser ? 'my-slot' : ''}">
+                <span class="player-name">${player}</span>
+                ${isCurrentUser ? 
+                    '<span class="player-indicator">You</span><button class="leave-button" onclick="leaveGroup()">Leave</button>' : 
+                    ''}
+            </div>
+        `;
+    }
+
+    reattachEventListeners() {
+        // Handle empty slot clicks to join a group
+        document.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
+            slot.addEventListener('click', function() {
+                const groupId = this.getAttribute('data-group-id');
+                joinGroup(groupId);
+            });
+        });
+        
+        // Handle create new group buttons
+        document.querySelectorAll('.create-group-button').forEach(button => {
+            button.addEventListener('click', function() {
+                const courtId = this.getAttribute('data-court-id');
+                createNewGroup(courtId);
+            });
+        });
+        
+        // Handle tap on user's own slot for mobile
+        document.querySelectorAll('.player-slot.my-slot').forEach(slot => {
+            slot.addEventListener('click', function(e) {
+                // Don't toggle if clicking directly on the leave button
+                if (e.target.classList.contains('leave-button')) {
+                    return;
+                }
+                
+                // Toggle the show-leave-button class
+                this.classList.toggle('show-leave-button');
+                
+                // Add a click handler to the document to close the button when clicking elsewhere
+                const closeLeaveButton = function(event) {
+                    if (!slot.contains(event.target)) {
+                        slot.classList.remove('show-leave-button');
+                        document.removeEventListener('click', closeLeaveButton);
+                    }
+                };
+                
+                // Add the document click handler with a slight delay to avoid immediate triggering
+                if (this.classList.contains('show-leave-button')) {
+                    setTimeout(() => {
+                        document.addEventListener('click', closeLeaveButton);
+                    }, 10);
+                }
+            });
+        });
+    }
 }
+
+// Add this at the top level of the file outside any class
+let isCreatingGroup = false;
+let isJoiningGroup = false;
+let isLeavingGroup = false;
 
 // Initialize on page load
 let courtManager;
@@ -528,6 +594,22 @@ function initLiveUpdates() {
 }
 
 function joinGroup(groupId) {
+  // If already joining a group, ignore additional clicks
+  if (isJoiningGroup) {
+    console.log('Already joining a group, please wait...');
+    return;
+  }
+  
+  // Set the flag to prevent multiple requests
+  isJoiningGroup = true;
+  
+  // Disable the clicked slot to provide visual feedback
+  const clickedSlot = document.querySelector(`.player-slot.empty[data-group-id="${groupId}"]`);
+  if (clickedSlot) {
+    clickedSlot.style.opacity = '0.5';
+    clickedSlot.style.pointerEvents = 'none';
+  }
+  
   fetch(`/join-slot/${groupId}`, {
     method: 'POST',
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -539,18 +621,54 @@ function joinGroup(groupId) {
       
       // Force an immediate refresh of the display
       sessionStorage.setItem('forceUpdate', 'true');
-      refreshCourts();
+      
+      // For a more reliable update, just reload the page
+      location.reload();
     } else {
       showFlashMessage(data.message, 'error');
+      
+      // Reset the clicked slot
+      if (clickedSlot) {
+        clickedSlot.style.opacity = '';
+        clickedSlot.style.pointerEvents = '';
+      }
+      
+      // Reset the flag
+      isJoiningGroup = false;
     }
   })
   .catch(error => {
     console.error('Error joining group:', error);
     showFlashMessage('Error joining group', 'error');
+    
+    // Reset the clicked slot
+    if (clickedSlot) {
+      clickedSlot.style.opacity = '';
+      clickedSlot.style.pointerEvents = '';
+    }
+    
+    // Reset the flag
+    isJoiningGroup = false;
   });
 }
 
 function createNewGroup(courtId) {
+  // If already creating a group, ignore additional clicks
+  if (isCreatingGroup) {
+    console.log('Already creating a group, please wait...');
+    return;
+  }
+  
+  // Set the flag to prevent multiple requests
+  isCreatingGroup = true;
+  
+  // Disable the button to provide visual feedback
+  const clickedButton = document.querySelector(`.create-group-button[data-court-id="${courtId}"]`);
+  if (clickedButton) {
+    clickedButton.disabled = true;
+    clickedButton.textContent = 'Creating...';
+  }
+  
   fetch(`/create-new-group/${courtId}`, {
     method: 'POST',
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -562,18 +680,53 @@ function createNewGroup(courtId) {
       
       // Force an immediate refresh of the display
       sessionStorage.setItem('forceUpdate', 'true');
-      refreshCourts();
+      
+      // For a more reliable update, just reload the page
+      location.reload();
     } else {
       showFlashMessage(data.message, 'error');
+      
+      // Reset the button
+      if (clickedButton) {
+        clickedButton.disabled = false;
+        clickedButton.textContent = 'Create New Group';
+      }
+      
+      // Reset the flag
+      isCreatingGroup = false;
     }
   })
   .catch(error => {
     console.error('Error creating group:', error);
     showFlashMessage('Error creating group', 'error');
+    
+    // Reset the button
+    if (clickedButton) {
+      clickedButton.disabled = false;
+      clickedButton.textContent = 'Create New Group';
+    }
+    
+    // Reset the flag
+    isCreatingGroup = false;
   });
 }
 
 function leaveGroup() {
+  // If already leaving a group, ignore additional clicks
+  if (isLeavingGroup) {
+    console.log('Already leaving a group, please wait...');
+    return;
+  }
+  
+  // Set the flag to prevent multiple requests
+  isLeavingGroup = true;
+  
+  // Find and disable all leave buttons to provide visual feedback
+  document.querySelectorAll('.leave-button').forEach(button => {
+    button.disabled = true;
+    button.textContent = 'Leaving...';
+  });
+  
   fetch('/leave-group', {
     method: 'POST',
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -585,14 +738,34 @@ function leaveGroup() {
       
       // Force an immediate refresh of the display
       sessionStorage.setItem('forceUpdate', 'true');
-      refreshCourts();
+      
+      // For a more reliable update, just reload the page
+      location.reload();
     } else {
       showFlashMessage(data.message, 'error');
+      
+      // Reset all leave buttons
+      document.querySelectorAll('.leave-button').forEach(button => {
+        button.disabled = false;
+        button.textContent = 'Leave';
+      });
+      
+      // Reset the flag
+      isLeavingGroup = false;
     }
   })
   .catch(error => {
     console.error('Error leaving group:', error);
     showFlashMessage('Error leaving group', 'error');
+    
+    // Reset all leave buttons
+    document.querySelectorAll('.leave-button').forEach(button => {
+      button.disabled = false;
+      button.textContent = 'Leave';
+    });
+    
+    // Reset the flag
+    isLeavingGroup = false;
   });
 }
 
