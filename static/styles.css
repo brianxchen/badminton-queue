@@ -255,6 +255,7 @@ button:disabled {
     font-size: 13px;
     color: var(--system-blue);
     font-weight: 500;
+    transition: opacity 0.2s ease;
 }
 
 .current-players li:enter, .queue li:enter {
@@ -293,12 +294,6 @@ button:disabled {
 
 .player-name {
     flex: 1;
-}
-
-.player-indicator {
-    font-size: 13px;
-    color: var(--system-blue);
-    font-weight: 500;
 }
 
 .inactive-message {
@@ -967,7 +962,7 @@ button:disabled {
   justify-content: space-between;
   position: relative;
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .player-slot.occupied {
@@ -992,34 +987,69 @@ button:disabled {
   transform: translateY(-1px);
 }
 
+/* Complete redesign of leave button animation to be stable during updates */
+
 .player-slot.my-slot {
   position: relative;
   overflow: hidden;
   border-left: 4px solid var(--system-blue) !important;
+  box-shadow: 0 0 0 1px var(--system-blue);
 }
 
+/* Use a pseudo-element for the leave button background */
+.player-slot.my-slot::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 60px;
+  background-color: var(--system-red);
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  z-index: 1;
+}
+
+.player-slot.my-slot:hover::after {
+  transform: translateX(0);
+}
+
+/* Position the leave button on top of the pseudo-element */
 .leave-button {
   position: absolute;
-  right: -80px;
+  right: 0;
   top: 0;
   bottom: 0;
-  background-color: var(--system-red);
+  width: 60px;
+  background-color: transparent; /* Make button transparent */
   color: white;
   border: none;
-  padding: 0 12px;
+  padding: 0;
   font-size: 14px;
   font-weight: 500;
-  transition: all 0.2s ease;
   cursor: pointer;
   height: 100%;
-  border-radius: 0;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none; /* Initially unclickable */
 }
 
 .player-slot.my-slot:hover .leave-button {
-  right: 0;
+  opacity: 1;
+  pointer-events: auto; /* Make clickable on hover */
 }
 
+.player-slot.my-slot .player-name,
+.player-slot.my-slot .player-indicator {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.player-slot.my-slot:hover .player-name,
 .player-slot.my-slot:hover .player-indicator {
+  transform: translateX(-50px);
   opacity: 0;
 }
 
@@ -1108,4 +1138,15 @@ button:disabled {
   background-color: var(--background-primary);
   font-size: 13px;
   padding: 6px 10px;
+}
+
+.loading-slot {
+  opacity: 0.4;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+  100% { opacity: 0.4; }
 }

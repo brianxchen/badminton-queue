@@ -40,7 +40,14 @@
             </div>
           {% endfor %}
         {% else %}
-          <div class="empty-message">No players currently on court</div>
+          <!-- The JS will replace this with slots that are connected to a newly created group -->
+          <div class="player-group">
+            {% for i in range(MAX_PLAYERS) %}
+              <div class="player-slot empty loading-slot">
+                <span class="slot-placeholder">Loading slots...</span>
+              </div>
+            {% endfor %}
+          </div>
         {% endif %}
       </div>
     </div>
@@ -110,6 +117,11 @@ function updateTimerDisplay() {
     .then(response => response.json())
     .then(data => {
       document.getElementById('timer').textContent = formatTime(data.remaining);
+      
+      // If the timer just expired, refresh the page
+      if (data.expired) {
+        location.reload();
+      }
     })
     .catch(error => console.error('Error fetching timer status:', error));
 }
@@ -148,6 +160,11 @@ function joinGroup(groupId) {
   .then(data => {
     if (data.success) {
       showFlashMessage(data.message, 'success');
+      
+      // Force an immediate refresh of the display
+      sessionStorage.setItem('forceUpdate', 'true');
+      // Immediate reload for the most reliable update
+      location.reload();
     } else {
       showFlashMessage(data.message, 'error');
     }
@@ -167,6 +184,11 @@ function createNewGroup(courtId) {
   .then(data => {
     if (data.success) {
       showFlashMessage(data.message, 'success');
+      
+      // Force an immediate refresh of the display
+      sessionStorage.setItem('forceUpdate', 'true');
+      // Immediate reload for the most reliable update
+      location.reload();
     } else {
       showFlashMessage(data.message, 'error');
     }
@@ -186,6 +208,11 @@ function leaveGroup() {
   .then(data => {
     if (data.success) {
       showFlashMessage(data.message, 'warning');
+      
+      // Force an immediate refresh of the display
+      sessionStorage.setItem('forceUpdate', 'true');
+      // Immediate reload for the most reliable update
+      location.reload();
     } else {
       showFlashMessage(data.message, 'error');
     }

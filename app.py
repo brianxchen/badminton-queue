@@ -540,6 +540,18 @@ def get_timer_status():
                 remaining_queue = queue_groups[1:] if queue_groups else []
                 for idx, group in enumerate(remaining_queue):
                     group.queue_position = idx + 1
+                
+                # Ensure there's always an active group on the court
+                # Check if court now has any active groups
+                has_active_group = any(not g.is_in_queue for g in court.groups)
+                if not has_active_group:
+                    # Create a new empty active group
+                    new_active_group = Group(
+                        court=court,
+                        is_in_queue=False,
+                        queue_position=None
+                    )
+                    db.session.add(new_active_group)
 
             db.session.commit()
 
@@ -648,7 +660,6 @@ def stop_timer():
         'status': 'success',
         'remaining': timer_state.remaining_time
     })
-
 @app.route('/clear-courts', methods=['POST'])
 def clear_courts():
     username = session.get('user')
@@ -669,8 +680,49 @@ def clear_courts():
         db.session.delete(group)
     
     db.session.commit()
+    
+    # Create one empty active group per court
+    courts = Court.query.all()
+    for court in courts:
+        active_group = Group(
+            court=court,
+            is_in_queue=False,
+            queue_position=None
+        )
+        db.session.add(active_group)
+    
+    db.session.commit()
     return jsonify({'status': 'success', 'message': 'All courts cleared'})
 
+@app.route('/create-empty-active-group/<int:court_id>', methods=['POST'])
+def create_empty_active_group(court_id):
+    court = Court.query.get(court_id)
+    if not court:
+        return jsonify({'success': False, 'message': 'Court not found'})
+    
+    # Check if there's already an active group
+    existing_active = Group.query.filter_by(court=court, is_in_queue=False).first()
+    if existing_active:
+        return jsonify({
+            'success': True, 
+            'group_id': existing_active.id,
+            'message': 'Using existing active group'
+        })
+    
+    # Create a new empty active group
+    active_group = Group(
+        court=court,
+        is_in_queue=False,
+        queue_position=None
+    )
+    db.session.add(active_group)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'group_id': active_group.id,
+        'message': 'Created new active group'
+    })
 @app.route('/toggle-club-status', methods=['POST'])
 def toggle_club_status():
     username = session.get('user')
