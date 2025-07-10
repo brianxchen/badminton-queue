@@ -20,8 +20,9 @@
 
 <div class="admin-section">
     <div class="section-card">
-        <h2>Court Timer</h2>
-        <div class="timer-display" id="timer">15:00</div>
+        <h2 class="timer-title">Court Timer</h2>
+        
+        <div id="timer" class="admin-timer-display">15:00</div>
         
         <div class="timer-controls">
             <div class="timer-duration-control">
@@ -43,52 +44,50 @@
 
 <div class="admin-section">
     <div class="section-card">
-        <h2>Court Management</h2>
-        <div class="admin-actions">
-            <button onclick="clearCourts()" class="danger-button">Clear All Courts</button>
-        </div>
-    </div>
-</div>
-
-<div class="admin-section">
-    <h2 class="section-title">Courts Overview</h2>
-    <div class="courts-admin-grid">
-        {% for court in courts %}
-        <div class="court-admin-card">
-            <h3>{{ court.name }}</h3>
-            
-            <div class="court-admin-info">
-                <div class="court-admin-players">
-                    <h4>Current Players</h4>
-                    <div class="player-list">
-                        {% if court.players %}
-                            {% for player in court.players %}
-                                <div class="player-item">{{ player.username }}</div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="empty-admin-message">No players</div>
-                        {% endif %}
-                    </div>
-                </div>
+        <h2 class="court-management-title">Court Management</h2>
+        
+        <div class="courts-admin-grid">
+            {% for court in courts %}
+            <div class="court-admin-card">
+                <h3>{{ court.name }}</h3>
                 
-                <div class="court-admin-queue">
-                    <h4>Queue</h4>
-                    <div class="queue-list">
-                        {% if court.queue %}
-                            {% for entry in court.queue | sort(attribute='position') %}
-                                <div class="queue-item">
-                                    <span class="queue-number">{{ entry.position }}</span>
-                                    {{ entry.user.username }}
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="empty-admin-message">No queue</div>
-                        {% endif %}
+                <div class="court-admin-info">
+                    <div class="court-admin-players">
+                        <h4>Current Players</h4>
+                        <div class="player-list">
+                            {% if court.players %}
+                                {% for player in court.players %}
+                                    <div class="player-item">{{ player.username }}</div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="empty-admin-message">No players</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="court-admin-queue">
+                        <h4>Queue</h4>
+                        <div class="queue-list">
+                            {% if court.queue %}
+                                {% for entry in court.queue | sort(attribute='position') %}
+                                    <div class="queue-item">
+                                        <span class="queue-number">{{ entry.position }}</span>
+                                        {{ entry.user.username }}
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="empty-admin-message">No queue</div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
+            {% endfor %}
         </div>
-        {% endfor %}
+        
+        <div class="admin-actions">
+            <button onclick="clearCourts()" class="danger-button clear-courts-button">Clear All Courts</button>
+        </div>
     </div>
 </div>
 
