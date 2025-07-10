@@ -3,7 +3,19 @@
 {% block content %}
 <div class="admin-header">
     <h1>Admin Panel</h1>
-    <a href="{{ url_for('home') }}" class="nav-button">Back to Home</a>
+    <div class="admin-header-actions">
+        <button id="clubStatusToggle"
+            class="club-status-button {{ 'active' if club_state.is_active else 'inactive' }}"
+            data-status="{{ 'deactivate' if club_state.is_active else 'activate' }}"
+            onclick="confirmToggleStatus()">
+            {% if club_state.is_active %}
+            Deactivate Club
+            {% else %}
+            Activate Club
+            {% endif %}
+        </button>
+        <a href="{{ url_for('home') }}" class="nav-button">Back to Home</a>
+    </div>
 </div>
 
 <div class="admin-section">
@@ -31,21 +43,7 @@
 
 <div class="admin-section">
     <div class="section-card">
-        <h2>Club Status</h2>
-        <button id="clubStatusToggle"
-            class="status-button {{ 'active' if club_state.is_active else 'inactive' }}"
-            data-status="{{ 'deactivate' if club_state.is_active else 'activate' }}"
-            onclick="confirmToggleStatus()">
-            {% if club_state.is_active %}
-            Deactivate Club
-            {% else %}
-            Activate Club
-            {% endif %}
-        </button>
-        <div id="statusIndicator" class="status-text">
-            Club is currently {{ 'active' if club_state.is_active else 'inactive' }}.
-        </div>
-        
+        <h2>Court Management</h2>
         <div class="admin-actions">
             <button onclick="clearCourts()" class="danger-button">Clear All Courts</button>
         </div>
@@ -207,11 +205,9 @@
       const data = await response.json();
 
       const button = document.getElementById('clubStatusToggle');
-      const indicator = document.getElementById('statusIndicator');
 
       button.textContent = data.is_active ? 'Deactivate Club' : 'Activate Club';
-      button.className = `status-button ${data.is_active ? 'active' : 'inactive'}`;
-      indicator.textContent = data.is_active ? 'Club is currently active.' : 'Club is currently inactive.';
+      button.className = `club-status-button ${data.is_active ? 'active' : 'inactive'}`;
     } catch (error) {
       console.error('Error fetching club status:', error);
     }

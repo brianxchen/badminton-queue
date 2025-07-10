@@ -583,6 +583,12 @@ button:disabled {
     margin: 0;
 }
 
+.admin-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .admin-section {
     margin-bottom: 32px;
 }
@@ -795,4 +801,50 @@ button:disabled {
 
 .admin-panel-button .text {
     font-weight: 600;
+}
+
+/* Admin Header Improvements */
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.admin-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.admin-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* New compact club status button */
+.club-status-button {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.club-status-button.active {
+    background-color: var(--system-red);
+    color: white;
+}
+
+.club-status-button.inactive {
+    background-color: var(--system-green);
+    color: white;
+}
+
+.club-status-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
