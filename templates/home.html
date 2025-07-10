@@ -5,23 +5,25 @@
 
 <div class="courts-grid">
   {% for court in courts %}
-  <div class="court-section" id="{{ court.name|replace(' ', '-') }}">
+  <div class="court-section" id="{{ court.name|replace(' ', '-') }}" data-court-id="{{ court.id }}">
     <h2>{{ court.name }}</h2>
 
     <!-- Players on Court -->
     <div class="players-list">
       <h3>Current Players</h3>
       <ul class="current-players">
-        {% for player in court.players %}
-          <li>
-            <span class="player-name">{{ player.username }}</span>
-            {% if session.user == player.username %}
-              <span class="player-indicator">You</span>
-            {% endif %}
-          </li>
+        {% if court.players %}
+          {% for player in court.players %}
+            <li>
+              <span class="player-name">{{ player.username }}</span>
+              {% if session.user == player.username %}
+                <span class="player-indicator">You</span>
+              {% endif %}
+            </li>
+          {% endfor %}
         {% else %}
-          <li>No players currently on court</li>
-        {% endfor %}
+          <li class="empty-message">No players currently on court</li>
+        {% endif %}
       </ul>
     </div>
 
@@ -29,17 +31,19 @@
     <div class="queue-list">
       <h3>Queue</h3>
       <ul class="queue">
-        {% for entry in court.queue | sort(attribute='position') %}
-          <li>
-            <span class="queue-number">{{ entry.position }}</span>
-            <span class="player-name">{{ entry.user.username }}</span>
-            {% if session.user == entry.user.username %}
-              <span class="player-indicator">You</span>
-            {% endif %}
-          </li>
+        {% if court.queue %}
+          {% for entry in court.queue | sort(attribute='position') %}
+            <li>
+              <span class="queue-number">{{ entry.position }}</span>
+              <span class="player-name">{{ entry.user.username }}</span>
+              {% if session.user == entry.user.username %}
+                <span class="player-indicator">You</span>
+              {% endif %}
+            </li>
+          {% endfor %}
         {% else %}
-          <li>No one in queue</li>
-        {% endfor %}
+          <li class="empty-message">No one in queue</li>
+        {% endif %}
       </ul>
     </div>
 
@@ -49,7 +53,7 @@
 
       <div class="court-controls">
         <!-- Join Court -->
-        <form action="{{ url_for('join_court', court_name=court.name) }}" method="POST" class="inline-form">
+        <form action="{{ url_for('join_court', court_name=court.name) }}" method="POST" class="inline-form court-action-form" data-action="join_court" data-court-id="{{ court.id }}">
           <button type="submit" class="join-button"
             {% if is_user_active_elsewhere(session.user)
                   or session.user in player_usernames
@@ -62,7 +66,7 @@
         </form>
 
         <!-- Join Queue -->
-        <form action="{{ url_for('join_queue', court_name=court.name) }}" method="POST" class="inline-form">
+        <form action="{{ url_for('join_queue', court_name=court.name) }}" method="POST" class="inline-form court-action-form" data-action="join_queue" data-court-id="{{ court.id }}">
           <button type="submit" class="join-button"
             {% if is_user_active_elsewhere(session.user)
                   or session.user in player_usernames
@@ -74,7 +78,8 @@
           </button>
         </form>
 
-        <form action="{{ url_for('leave_court', court_name=court.name) }}" method="POST" class="inline-form">
+        <!-- Leave Court or Queue -->
+        <form action="{{ url_for('leave_court', court_name=court.name) }}" method="POST" class="inline-form court-action-form" data-action="leave_court" data-court-id="{{ court.id }}">
             <button 
             type="submit" 
             class="danger-button {% if not is_user_on_court_or_queue(session.user, court) %}hidden{% endif %}">
@@ -91,13 +96,15 @@
 
 {% block scripts %}
 <script>
+window.currentUser = "{{ session.user if session.user else '' }}";
+
 function updateTimerDisplay() {
   fetch('/timer/status')
     .then(response => response.json())
     .then(data => {
       document.getElementById('timer').textContent = formatTime(data.remaining);
-      updateCourtsDisplay(data.courts);
-    });
+    })
+    .catch(error => console.error('Error fetching timer status:', error));
 }
 
 function formatTime(seconds) {

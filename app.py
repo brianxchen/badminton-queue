@@ -234,10 +234,13 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
+# Update the join_court route to handle AJAX
 @app.route('/join_court/<court_name>', methods=['POST'])
 def join_court(court_name):
     username = session.get('user')
     if not username:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'You must be logged in to join a court'}), 401
         flash('You must be logged in to join a court', 'error')
         return redirect(url_for('login'))
 
@@ -246,16 +249,38 @@ def join_court(court_name):
 
     if court and len(court.players) < MAX_PLAYERS:
         if not is_user_active_elsewhere(user):
-            if not user.court:  # Already handled by FK
+            if not user.court:
                 user.court = court
                 db.session.commit()
-                flash(f'You joined {court.name}', 'success')
+                
+                message = f'You joined {court.name}'
+                flash(message, 'success')
+                
+                # Return JSON response for AJAX requests
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({
+                        'success': True,
+                        'court_id': court.id,
+                        'court_name': court.name,
+                        'action': 'join_court',
+                        'username': username,
+                        'message': message
+                    })
             else:
-                flash('You are already on a court.', 'error')
+                message = 'You are already on a court.'
+                flash(message, 'error')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'message': message})
         else:
-            flash('You are already active elsewhere.', 'error')
+            message = 'You are already active elsewhere.'
+            flash(message, 'error')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': message})
     else:
-        flash('Court is full or does not exist.', 'error')
+        message = 'Court is full or does not exist.'
+        flash(message, 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': message})
 
     return redirect(url_for('home'))
 
@@ -306,9 +331,12 @@ def join_queue(court_name):
 
     return redirect(url_for('home'))
 
+# Update the leave_court route to handle AJAX
 @app.route('/leave_court/<court_name>', methods=['POST'])
 def leave_court(court_name):
     if 'user' not in session:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'You must be logged in'}), 401
         return redirect(url_for('login'))
     
     username = session['user']
@@ -317,11 +345,12 @@ def leave_court(court_name):
     timer_state = TimerState.query.first()
     
     if not user or not court:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'User or court not found'})
         return redirect(url_for('home'))
 
-    app.logger.info(f"User {username} leaving court or queue for {court_name}")
-
     did_something = False
+    message = ""
 
     # Leave *any* queue entry
     if user.queue_entry:
@@ -332,9 +361,10 @@ def leave_court(court_name):
         if user.queue_entry.court_id == court.id:
             for i, entry in enumerate(court.queue, 1):
                 entry.position = i
-        flash(f'You left the queue for {court.name}', 'warning')
+        message = f'You left the queue for {court.name}'
+        flash(message, 'warning')
 
-    # Leave court if they’re on this court and timer is not running
+    # Leave court if they're on this court and timer is not running
     if user.court == court:
         if not timer_state.is_running:
             user.court = None
@@ -347,13 +377,28 @@ def leave_court(court_name):
                 db.session.delete(next_entry)
                 for i, entry in enumerate(court.queue[1:], 1):
                     entry.position = i
-            flash(f'You left the court for {court.name}', 'warning')
+            message = f'You left the court for {court.name}'
+            flash(message, 'warning')
         else:
-            flash('Cannot leave court while timer is running', 'error')
+            message = 'Cannot leave court while timer is running'
+            flash(message, 'error')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': message})
 
     if did_something:
         db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'court_id': court.id,
+                'court_name': court.name,
+                'action': 'leave_court',
+                'username': username,
+                'message': message
+            })
 
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': False, 'message': 'No action taken'})
     return redirect(url_for('home'))
 
 

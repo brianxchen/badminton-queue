@@ -21,8 +21,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update UI immediately
                     updateUIForAction(data);
                     
-                    // Show success message
-                    showFlashMessage(data.message, 'success');
+                    // Determine message category based on action
+                    let category = 'success';
+                    if (action === 'leave_court') {
+                        category = 'warning';
+                    }
+                    
+                    // Show success message with proper category
+                    showFlashMessage(data.message, category);
                 } else {
                     showFlashMessage(data.message || 'An error occurred', 'error');
                 }
@@ -36,54 +42,42 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to update UI based on action
     function updateUIForAction(data) {
-        const courtId = data.court_id;
-        const username = data.username;
-        const action = data.action;
+        // Rather than trying to update the DOM directly,
+        // we'll rely on the SSE events to update the court data
+        // That's much cleaner and avoids sync issues
         
-        // Find the court container
-        const courtContainer = document.querySelector(`.court-container[data-court-id="${courtId}"]`);
-        
-        if (action === 'join_queue') {
-            // Hide join buttons
-            courtContainer.querySelector('.join-buttons').style.display = 'none';
-            // Show leave button
-            courtContainer.querySelector('.leave-button').style.display = 'block';
+        // Disable/enable buttons as needed
+        document.querySelectorAll('.court-section').forEach(courtSection => {
+            const courtId = courtSection.dataset.courtId;
+            const isUserAction = (data.username === window.currentUser);
             
-            // Update queue display
-            const queueList = courtContainer.querySelector('.queue-list');
-            const listItem = document.createElement('li');
-            listItem.textContent = username;
-            listItem.classList.add('queue-item');
-            listItem.dataset.username = username;
-            queueList.appendChild(listItem);
-        } 
-        else if (action === 'join_court') {
-            // Hide join buttons
-            courtContainer.querySelector('.join-buttons').style.display = 'none';
-            // Show leave button
-            courtContainer.querySelector('.leave-button').style.display = 'block';
-            
-            // Update players display
-            const playersList = courtContainer.querySelector('.players-list');
-            const listItem = document.createElement('li');
-            listItem.textContent = username;
-            listItem.classList.add('player-item');
-            listItem.dataset.username = username;
-            playersList.appendChild(listItem);
-        }
-        else if (action === 'leave_court') {
-            // Show join buttons
-            courtContainer.querySelector('.join-buttons').style.display = 'block';
-            // Hide leave button
-            courtContainer.querySelector('.leave-button').style.display = 'none';
-            
-            // Remove from players/queue
-            const playerItem = courtContainer.querySelector(`.player-item[data-username="${username}"]`);
-            if (playerItem) playerItem.remove();
-            
-            const queueItem = courtContainer.querySelector(`.queue-item[data-username="${username}"]`);
-            if (queueItem) queueItem.remove();
-        }
+            if (isUserAction) {
+                // If this user did something, update all buttons
+                const joinButtons = courtSection.querySelectorAll('.join-button');
+                const leaveButton = courtSection.querySelector('.danger-button');
+                
+                if (data.action === 'join_court' || data.action === 'join_queue') {
+                    // If user joined anywhere, disable join buttons everywhere
+                    joinButtons.forEach(btn => btn.disabled = true);
+                    
+                    // Only show leave button on the court the user joined
+                    if (parseInt(courtId) === data.court_id) {
+                        leaveButton.classList.remove('hidden');
+                    } else {
+                        leaveButton.classList.add('hidden');
+                    }
+                }
+                else if (data.action === 'leave_court') {
+                    // If user left, enable join buttons everywhere
+                    joinButtons.forEach(btn => btn.disabled = false);
+                    
+                    // Hide the leave button on the court the user left
+                    if (parseInt(courtId) === data.court_id) {
+                        leaveButton.classList.add('hidden');
+                    }
+                }
+            }
+        });
     }
     
     // Function to show flash messages
@@ -95,17 +89,35 @@ document.addEventListener('DOMContentLoaded', function() {
         
         flashContainer.appendChild(msgElement);
         
-        // Fade in
-        setTimeout(() => {
-            msgElement.style.opacity = '1';
-        }, 10);
+        // Set color based on category
+        switch(category) {
+            case 'success':
+                msgElement.style.backgroundColor = '#34C759'; // iOS Green
+                break;
+            case 'error':
+                msgElement.style.backgroundColor = '#FF3B30'; // iOS Red
+                break;
+            case 'warning':
+                msgElement.style.backgroundColor = '#FF9500'; // iOS Orange
+                break;
+            default:
+                msgElement.style.backgroundColor = '#007AFF'; // iOS Blue
+                break;
+        }
         
-        // Fade out after 3 seconds
+        // Trigger reflow for animation to work
+        void msgElement.offsetWidth;
+        
+        // Fade in
+        msgElement.classList.add('fade-in');
+        
+        // Fade out after 4 seconds
         setTimeout(() => {
-            msgElement.style.opacity = '0';
+            msgElement.classList.remove('fade-in');
+            msgElement.classList.add('fade-out');
             setTimeout(() => {
                 msgElement.remove();
             }, 500);
-        }, 3000);
+        }, 4000);
     }
 });
