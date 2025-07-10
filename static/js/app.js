@@ -121,3 +121,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 4000);
     }
 });
+
+// Add a function to manually refresh courts if needed
+async function refreshCourts() {
+    try {
+        const response = await fetch('/court-updates-poll');
+        const data = await response.json();
+        if (data.courts && courtManager) {
+            courtManager.updateCourtsDisplay(data.courts);
+        }
+    } catch (error) {
+        console.error('Error refreshing courts:', error);
+    }
+}
+
+// Test if server-sent events are working, and if not, set up manual refresh
+let sseWorkingTest = false;
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        if (!sseWorkingTest && courtManager) {
+            console.log("SSE might not be working, setting up manual refresh trigger");
+            
+            // Add a manual refresh after court actions
+            document.querySelectorAll('.court-action-form').forEach(form => {
+                const originalSubmit = form.onsubmit;
+                form.onsubmit = async function(e) {
+                    if (originalSubmit) {
+                        originalSubmit.call(this, e);
+                    }
+                    
+                    // After a short delay, manually refresh
+                    setTimeout(refreshCourts, 500);
+                };
+            });
+            
+            // Also set up periodic refresh just in case
+            setInterval(refreshCourts, 5000);
+        }
+    }, 5000); // Check after 5 seconds
+});
+
+// Update the sse test flag when a message is received
+if (courtManager && courtManager.evtSource) {
+    courtManager.evtSource.addEventListener('message', () => {
+        sseWorkingTest = true;
+    });
+}
