@@ -109,6 +109,25 @@ def is_user_active_elsewhere(user):
         return False
     return user.court is not None or user.queue_entry is not None
 
+def is_user_on_court_or_queue(username, court):
+    """Check if user is on this specific court or in its queue"""
+    if not username:
+        return False
+    
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return False
+    
+    # Check if user is on this court
+    if user.court_id == court.id:
+        return True
+    
+    # Check if user is in this court's queue
+    for queue_entry in court.queue:
+        if queue_entry.user_id == user.id:
+            return True
+    
+    return False
 def is_player_on_court(user):
     """Check if player is currently on any court"""
     if isinstance(user, str):
@@ -139,6 +158,7 @@ def inject_utilities():
         'club_state': club_state,
         'is_player_on_court': is_player_on_court,
         'timer_state': timer_state,
+        'is_user_on_court_or_queue': is_user_on_court_or_queue,  # Add this line
         'signature': get_random_signature()
     }
 
@@ -253,18 +273,36 @@ def join_queue(court_name):
     if court and not user.queue_entry:
         if not is_user_active_elsewhere(user):
             if not user.court:
-                # Add to queue
-                next_position = len(court.queue) + 1
-                new_entry = QueueEntry(court=court, user=user, position=next_position)
-                db.session.add(new_entry)
+                # Calculate position - it should be the length of the current queue + 1
+                next_position = 1  # Default to 1 if no entries
+                
+                # Get the last entry's position if there are entries
+                last_entry = QueueEntry.query.filter_by(court_id=court.id).order_by(QueueEntry.position.desc()).first()
+                if last_entry:
+                    next_position = last_entry.position + 1
+                
+                # Add to queue with correct position
+                queue_entry = QueueEntry(user=user, court=court, position=next_position)
+                db.session.add(queue_entry)
                 db.session.commit()
                 flash(f'You joined the queue for {court.name}', 'success')
+                
+                # If this is an AJAX request, return updated data
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({
+                        'success': True,
+                        'court_id': court.id,
+                        'court_name': court.name,
+                        'action': 'join_queue',
+                        'username': username,
+                        'message': f'You joined the queue for {court.name}'
+                    })
             else:
                 flash('You are already on a court.', 'error')
         else:
             flash('You are already active elsewhere.', 'error')
     else:
-        flash('You are already in a queue or court does not exist.', 'error')
+        flash('Court is full or does not exist.', 'error')
 
     return redirect(url_for('home'))
 
