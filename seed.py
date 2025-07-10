@@ -1,40 +1,63 @@
 # seed.py
-from app import app, db, Court, TimerState, ClubState, User
+from app import app, db, Court, TimerState, ClubState, User, Group
 from werkzeug.security import generate_password_hash
-
 with app.app_context():
-    db.create_all()  # or db.drop_all(); db.create_all() if you want fresh tables
+    db.drop_all()
+    db.create_all()   # Create all tables if they don't exist
 
-    # Seed default courts
+    # Add default courts if none exist
     if not Court.query.first():
         default_courts = ['Court 1', 'Court 2', 'Court 3', 'Court 4']
         for name in default_courts:
-            db.session.add(Court(name=name))
+            court = Court(name=name)
+            db.session.add(court)
 
-    # Seed default TimerState
+    # Create default TimerState if none exists
     if not TimerState.query.first():
-        db.session.add(TimerState(is_running=False))
+        timer_state = TimerState(is_running=False)  # adjust fields as per your model
+        db.session.add(timer_state)
 
-    # Seed default ClubState
+    # Create default ClubState if none exists
     if not ClubState.query.first():
-        db.session.add(ClubState())
-
-    # Seed default admin user
+        club_state = ClubState()  # fill in default fields if needed
+        db.session.add(club_state)
+    
+    # Add admin user if not exists
     if not User.query.filter_by(username='admin').first():
-        db.session.add(User(
+        admin = User(
             username='admin',
             password_hash=generate_password_hash('adminpass'),
             is_admin=True
-        ))
-
+        )
+        db.session.add(admin)
+        
     # Add test users
-    for username in ['a', 'b', 'c']:
+    test_users = ['a', 'b', 'c']
+    for username in test_users:
         if not User.query.filter_by(username=username).first():
-            db.session.add(User(
+            user = User(
                 username=username,
-                password_hash=generate_password_hash(username),
+                password_hash=generate_password_hash(username),  # password same as username
                 is_admin=False
-            ))
-
+            )
+            db.session.add(user)
+            
+    # Commit to create courts and users first
+    db.session.commit()
+            
+    # Create one empty active group per court
+    courts = Court.query.all()
+    for court in courts:
+        # Check if court already has an active group
+        existing_active = Group.query.filter_by(court=court, is_in_queue=False).first()
+        if not existing_active:
+            active_group = Group(
+                court=court,
+                is_in_queue=False,
+                queue_position=None
+            )
+            db.session.add(active_group)
+            
+    # Commit all changes
     db.session.commit()
     print("✅ Seeding done!")
