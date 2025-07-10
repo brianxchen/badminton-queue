@@ -940,3 +940,129 @@ button:disabled {
     font-size: 22px;
     font-weight: 600;
 }
+
+/* Group styles */
+.court-group, .queue-groups {
+  margin-top: 12px;
+}
+
+.player-group, .queue-group {
+  background: var(--background-secondary);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.player-slot {
+  background: var(--background-primary);
+  border-radius: 8px;
+  padding: 10px 14px;
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.player-slot.occupied {
+  border-left: 4px solid var(--system-green);
+}
+
+.player-slot.empty {
+  border-left: 4px solid var(--text-secondary);
+  opacity: 0.7;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.player-slot.empty:hover {
+  opacity: 1;
+  background-color: var(--background-secondary);
+  transform: translateY(-3px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.player-slot.empty:active {
+  transform: translateY(-1px);
+}
+
+.player-slot.my-slot {
+  position: relative;
+  overflow: hidden;
+  border-left: 4px solid var(--system-blue) !important;
+}
+
+.leave-button {
+  position: absolute;
+  right: -80px;
+  top: 0;
+  bottom: 0;
+  background-color: var(--system-red);
+  color: white;
+  border: none;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  height: 100%;
+  border-radius: 0;
+}
+
+.player-slot.my-slot:hover .leave-button {
+  right: 0;
+}
+
+.player-slot.my-slot:hover .player-indicator {
+  opacity: 0;
+}
+
+.slot-placeholder {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.queue-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.queue-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.create-group-container {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.create-group-button {
+  background-color: var(--system-blue);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.create-group-button:hover {
+  background-color: #0062CC;
+  transform: translateY(-2px);
+}
+
+.leave-group-button {
+  margin-top: 16px;
+  width: 100%;
+}

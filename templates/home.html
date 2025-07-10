@@ -3,92 +3,98 @@
 {% block content %}
 <div class="timer-display" id="timer">15:00</div>
 
+
 <div class="courts-grid">
   {% for court in courts %}
   <div class="court-section" id="{{ court.name|replace(' ', '-') }}" data-court-id="{{ court.id }}">
     <h2>{{ court.name }}</h2>
 
-    <!-- Players on Court -->
+    <!-- Active Groups on Court -->
     <div class="players-list">
       <h3>Current Players</h3>
-      <ul class="current-players">
-        {% if court.players %}
-          {% for player in court.players %}
-            <li>
-              <span class="player-name">{{ player.username }}</span>
-              {% if session.user == player.username %}
-                <span class="player-indicator">You</span>
-              {% endif %}
-            </li>
+      <div class="court-group">
+        {% set active_groups = court.groups|selectattr('is_in_queue', 'equalto', False)|list %}
+        
+        {% if active_groups %}
+          {% for group in active_groups %}
+            <div class="player-group {% if group.is_full() %}full{% endif %}">
+              {% for player in group.players %}
+                <div class="player-slot occupied {% if session.user == player.username %}my-slot{% endif %}">
+                  <span class="player-name">{{ player.username }}</span>
+                  {% if session.user == player.username %}
+                    <span class="player-indicator">You</span>
+                    <button class="leave-button" onclick="leaveGroup()">Leave</button>
+                  {% endif %}
+                </div>
+              {% endfor %}
+              
+              <!-- Empty slots in active group -->
+              {% for i in range(MAX_PLAYERS - group.players|length) %}
+                <div class="player-slot empty" 
+                    {% if session.user and not is_user_active(session.user) %}
+                    data-group-id="{{ group.id }}"
+                    {% endif %}>
+                  <span class="slot-placeholder">Empty Slot</span>
+                </div>
+              {% endfor %}
+            </div>
           {% endfor %}
         {% else %}
-          <li class="empty-message">No players currently on court</li>
+          <div class="empty-message">No players currently on court</div>
         {% endif %}
-      </ul>
+      </div>
     </div>
 
-    <!-- Queue for Court -->
+    <!-- Queue Groups -->
     <div class="queue-list">
       <h3>Queue</h3>
-      <ul class="queue">
-        {% if court.queue %}
-          {% for entry in court.queue | sort(attribute='position') %}
-            <li>
-              <span class="queue-number">{{ entry.position }}</span>
-              <span class="player-name">{{ entry.user.username }}</span>
-              {% if session.user == entry.user.username %}
-                <span class="player-indicator">You</span>
-              {% endif %}
-            </li>
+      <div class="queue-groups">
+        {% set queue_groups = court.groups|selectattr('is_in_queue', 'equalto', True)|sort(attribute='queue_position') %}
+        
+        {% if queue_groups %}
+          {% for group in queue_groups %}
+            <div class="queue-group">
+              <div class="queue-header">
+                <span class="queue-number">{{ group.queue_position }}</span>
+              </div>
+              
+              <div class="queue-slots">
+                {% for player in group.players %}
+                  <div class="player-slot occupied {% if session.user == player.username %}my-slot{% endif %}">
+                    <span class="player-name">{{ player.username }}</span>
+                    {% if session.user == player.username %}
+                      <span class="player-indicator">You</span>
+                      <button class="leave-button" onclick="leaveGroup()">Leave</button>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+                
+                <!-- Empty slots in queue group -->
+                {% for i in range(MAX_PLAYERS - group.players|length) %}
+                  <div class="player-slot empty"
+                      {% if session.user and not is_user_active(session.user) %}
+                      data-group-id="{{ group.id }}"
+                      {% endif %}>
+                    <span class="slot-placeholder">Empty Slot</span>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
           {% endfor %}
         {% else %}
-          <li class="empty-message">No one in queue</li>
+          <div class="empty-message">No one in queue</div>
         {% endif %}
-      </ul>
-    </div>
-
-    {% if session.user %}
-      {% set player_usernames = court.players | map(attribute='username') | list %}
-      {% set queue_usernames = court.queue | map(attribute='user.username') | list %}
-
-      <div class="court-controls">
-        <!-- Join Court -->
-        <form action="{{ url_for('join_court', court_name=court.name) }}" method="POST" class="inline-form court-action-form" data-action="join_court" data-court-id="{{ court.id }}">
-          <button type="submit" class="join-button"
-            {% if is_user_active_elsewhere(session.user)
-                  or session.user in player_usernames
-                  or session.user in queue_usernames
-                  or is_player_on_court(session.user) %}
-            disabled
-            {% endif %}>
-            Join Court
-          </button>
-        </form>
-
-        <!-- Join Queue -->
-        <form action="{{ url_for('join_queue', court_name=court.name) }}" method="POST" class="inline-form court-action-form" data-action="join_queue" data-court-id="{{ court.id }}">
-          <button type="submit" class="join-button"
-            {% if is_user_active_elsewhere(session.user)
-                  or session.user in player_usernames
-                  or session.user in queue_usernames
-                  or is_player_on_court(session.user) %}
-            disabled
-            {% endif %}>
-            Join Queue
-          </button>
-        </form>
-
-        <!-- Leave Court or Queue -->
-        <form action="{{ url_for('leave_court', court_name=court.name) }}" method="POST" class="inline-form court-action-form" data-action="leave_court" data-court-id="{{ court.id }}">
-            <button 
-            type="submit" 
-            class="danger-button {% if not is_user_on_court_or_queue(session.user, court) %}hidden{% endif %}">
-            Leave
+        
+        <!-- Always show the "Create New Group" button if user is logged in and not in a group -->
+        {% if session.user and not is_user_active(session.user) %}
+          <div class="create-group-container">
+            <button class="create-group-button" data-court-id="{{ court.id }}">
+              Create New Group
             </button>
-        </form>
-          
+          </div>
+        {% endif %}
       </div>
-    {% endif %}
+    </div>
   </div>
   {% endfor %}
 </div>
@@ -97,6 +103,7 @@
 {% block scripts %}
 <script>
 window.currentUser = "{{ session.user if session.user else '' }}";
+window.MAX_PLAYERS = {{ MAX_PLAYERS|tojson }};
 
 function updateTimerDisplay() {
   fetch('/timer/status')
@@ -111,6 +118,122 @@ function formatTime(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Add event listeners for joining slots and creating groups
+document.addEventListener('DOMContentLoaded', function() {
+  // Handle empty slot clicks to join a group
+  document.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
+    slot.addEventListener('click', function() {
+      const groupId = this.getAttribute('data-group-id');
+      joinGroup(groupId);
+    });
+  });
+  
+  // Handle create new group buttons
+  document.querySelectorAll('.create-group-button').forEach(button => {
+    button.addEventListener('click', function() {
+      const courtId = this.getAttribute('data-court-id');
+      createNewGroup(courtId);
+    });
+  });
+});
+
+function joinGroup(groupId) {
+  fetch(`/join-slot/${groupId}`, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showFlashMessage(data.message, 'success');
+    } else {
+      showFlashMessage(data.message, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error joining group:', error);
+    showFlashMessage('Error joining group', 'error');
+  });
+}
+
+function createNewGroup(courtId) {
+  fetch(`/create-new-group/${courtId}`, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showFlashMessage(data.message, 'success');
+    } else {
+      showFlashMessage(data.message, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error creating group:', error);
+    showFlashMessage('Error creating group', 'error');
+  });
+}
+
+function leaveGroup() {
+  fetch('/leave-group', {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showFlashMessage(data.message, 'warning');
+    } else {
+      showFlashMessage(data.message, 'error');
+    }
+  })
+  .catch(error => {
+    console.error('Error leaving group:', error);
+    showFlashMessage('Error leaving group', 'error');
+  });
+}
+
+function showFlashMessage(message, category) {
+  const flashContainer = document.getElementById('flashMessages');
+  const msgElement = document.createElement('div');
+  msgElement.className = `flash-message ${category}`;
+  msgElement.textContent = message;
+  
+  flashContainer.appendChild(msgElement);
+  
+  // Set color based on category
+  switch(category) {
+    case 'success':
+      msgElement.style.backgroundColor = '#34C759'; // iOS Green
+      break;
+    case 'error':
+      msgElement.style.backgroundColor = '#FF3B30'; // iOS Red
+      break;
+    case 'warning':
+      msgElement.style.backgroundColor = '#FF9500'; // iOS Orange
+      break;
+    default:
+      msgElement.style.backgroundColor = '#007AFF'; // iOS Blue
+      break;
+  }
+  
+  // Trigger reflow for animation to work
+  void msgElement.offsetWidth;
+  
+  // Fade in
+  msgElement.classList.add('fade-in');
+  
+  // Fade out after 4 seconds
+  setTimeout(() => {
+    msgElement.classList.remove('fade-in');
+    msgElement.classList.add('fade-out');
+    setTimeout(() => {
+      msgElement.remove();
+    }, 500);
+  }, 4000);
 }
 
 setInterval(updateTimerDisplay, 1000);

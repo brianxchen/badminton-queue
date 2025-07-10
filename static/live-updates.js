@@ -1,5 +1,8 @@
 class CourtManager {
     constructor() {
+        this.connectionAttempts = 0;
+        this.maxConnectionAttempts = 5;
+        this.retryInterval = 3000; // 3 seconds
         this.initializeEventSource();
         this.initializeTimer();
     }
@@ -8,17 +11,59 @@ class CourtManager {
         this.evtSource = new EventSource('/court-updates');
         
         this.evtSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.courts) {
-                this.updateCourtsDisplay(data.courts);
+            console.log("SSE message received"); // Debug log
+            this.connectionAttempts = 0; // Reset connection attempts on successful message
+            try {
+                const data = JSON.parse(event.data);
+                if (data.courts) {
+                    this.updateCourtsDisplay(data.courts);
+                }
+            } catch (err) {
+                console.error("Error parsing SSE data:", err);
             }
         };
         
         this.evtSource.onerror = (err) => {
             console.error('EventSource failed:', err);
             this.evtSource.close();
-            setTimeout(() => this.initializeEventSource(), 5000);
+            
+            // Increment connection attempts
+            this.connectionAttempts++;
+            
+            if (this.connectionAttempts < this.maxConnectionAttempts) {
+                console.log(`Retrying SSE connection (${this.connectionAttempts}/${this.maxConnectionAttempts})...`);
+                setTimeout(() => this.initializeEventSource(), this.retryInterval);
+            } else {
+                console.error("Max SSE connection attempts reached. Falling back to polling.");
+                this.startPolling();
+            }
         };
+        
+        this.evtSource.onopen = () => {
+            console.log("SSE connection opened");
+            // If we were polling, stop it
+            if (this.pollingInterval) {
+                console.log("Stopping fallback polling");
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+            }
+        };
+    }
+    
+    // Fallback to polling if SSE fails
+    startPolling() {
+        console.log("Starting fallback polling for court updates");
+        this.pollingInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/court-updates-poll');
+                const data = await response.json();
+                if (data.courts) {
+                    this.updateCourtsDisplay(data.courts);
+                }
+            } catch (error) {
+                console.error('Error polling for updates:', error);
+            }
+        }, 2000); // Poll every 2 seconds
     }
 
     initializeTimer() {
@@ -53,49 +98,198 @@ class CourtManager {
             const courtElement = document.getElementById(courtId);
             if (!courtElement) continue;
 
-            // Update players list
-            const playersUl = courtElement.querySelector('.current-players');
-            if (playersUl) {
-                // Important: Add check for if the array exists AND has length
-                if (Array.isArray(courtData.players) && courtData.players.length > 0) {
-                    playersUl.innerHTML = courtData.players
-                        .map(player => `
-                            <li>
-                                <span class="player-name">${player}</span>
-                                ${player === window.currentUser ? 
-                                    '<span class="player-indicator">You</span>' : 
-                                    ''}
-                            </li>
-                        `).join('');
+            // Update active groups
+            const playersContainer = courtElement.querySelector('.court-group');
+            if (playersContainer) {
+                if (courtData.active_groups && courtData.active_groups.length > 0) {
+                    let groupsHTML = '';
+                    
+                    courtData.active_groups.forEach(group => {
+                        let playerSlotsHTML = '';
+                        
+                        // Add occupied slots
+                        group.players.forEach(player => {
+                            playerSlotsHTML += `
+                                <div class="player-slot occupied ${player === window.currentUser ? 'my-slot' : ''}">
+                                    <span class="player-name">${player}</span>
+                                    ${player === window.currentUser ? 
+                                        '<span class="player-indicator">You</span><button class="leave-button" onclick="leaveGroup()">Leave</button>' : 
+                                        ''}
+                                </div>
+                            `;
+                        });
+                        
+                        // Add empty slots
+                        const emptySlots = MAX_PLAYERS - group.players.length;
+                        for (let i = 0; i < emptySlots; i++) {
+                            const isUserActive = this.isUserActive();
+                            playerSlotsHTML += `
+                                <div class="player-slot empty" ${!isUserActive ? `data-group-id="${group.id}"` : ''}>
+                                    <span class="slot-placeholder">Empty Slot</span>
+                                </div>
+                            `;
+                        }
+                        
+                        groupsHTML += `
+                            <div class="player-group ${group.is_full ? 'full' : ''}">
+                                ${playerSlotsHTML}
+                            </div>
+                        `;
+                    });
+                    
+                    playersContainer.innerHTML = groupsHTML;
+                    
+                    // Add click event listeners to empty slots
+                    playersContainer.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
+                        slot.addEventListener('click', function() {
+                            const groupId = this.getAttribute('data-group-id');
+                            joinGroup(groupId);
+                        });
+                    });
                 } else {
-                    // Always show the empty message when no players
-                    playersUl.innerHTML = '<li class="empty-message">No players currently on court</li>';
+                    playersContainer.innerHTML = '<div class="empty-message">No players currently on court</div>';
                 }
             }
 
-            // Update queue list with numbers
-            const queueUl = courtElement.querySelector('.queue');
-            if (queueUl) {
-                // Important: Add check for if the array exists AND has length
-                if (Array.isArray(courtData.queue) && courtData.queue.length > 0) {
-                    queueUl.innerHTML = courtData.queue
-                        .map((player, index) => `
-                            <li>
-                                <span class="queue-number">${index + 1}</span>
-                                <span class="player-name">${player}</span>
-                                ${player === window.currentUser ? 
-                                    '<span class="player-indicator">You</span>' : 
-                                    ''}
-                            </li>
-                        `).join('');
+            // Update queue groups
+            const queueContainer = courtElement.querySelector('.queue-groups');
+            if (queueContainer) {
+                if (courtData.queue_groups && courtData.queue_groups.length > 0) {
+                    let groupsHTML = '';
+                    
+                    courtData.queue_groups.forEach(group => {
+                        let playerSlotsHTML = '';
+                        
+                        // Add occupied slots
+                        group.players.forEach(player => {
+                            playerSlotsHTML += `
+                                <div class="player-slot occupied ${player === window.currentUser ? 'my-slot' : ''}">
+                                    <span class="player-name">${player}</span>
+                                    ${player === window.currentUser ? 
+                                        '<span class="player-indicator">You</span><button class="leave-button" onclick="leaveGroup()">Leave</button>' : 
+                                        ''}
+                                </div>
+                            `;
+                        });
+                        
+                        // Add empty slots
+                        const emptySlots = MAX_PLAYERS - group.players.length;
+                        for (let i = 0; i < emptySlots; i++) {
+                            const isUserActive = this.isUserActive();
+                            playerSlotsHTML += `
+                                <div class="player-slot empty" ${!isUserActive ? `data-group-id="${group.id}"` : ''}>
+                                    <span class="slot-placeholder">Empty Slot</span>
+                                </div>
+                            `;
+                        }
+                        
+                        groupsHTML += `
+                            <div class="queue-group">
+                                <div class="queue-header">
+                                    <span class="queue-number">${group.position}</span>
+                                </div>
+                                <div class="queue-slots">
+                                    ${playerSlotsHTML}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    // Always add "Create New Group" button if user is logged in and not active
+                    if (window.currentUser && !this.isUserActive()) {
+                        groupsHTML += `
+                            <div class="create-group-container">
+                                <button class="create-group-button" data-court-id="${courtData.id}">
+                                    Create New Group
+                                </button>
+                            </div>
+                        `;
+                    }
+                    
+                    queueContainer.innerHTML = groupsHTML;
+                    
+                    // Add click event listeners to empty slots
+                    queueContainer.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
+                        slot.addEventListener('click', function() {
+                            const groupId = this.getAttribute('data-group-id');
+                            joinGroup(groupId);
+                        });
+                    });
+                    
+                    // Add click event listeners to create group buttons
+                    queueContainer.querySelectorAll('.create-group-button').forEach(button => {
+                        button.addEventListener('click', function() {
+                            const courtId = this.getAttribute('data-court-id');
+                            createNewGroup(courtId);
+                        });
+                    });
                 } else {
-                    // Always show the empty message when no queue entries
-                    queueUl.innerHTML = '<li class="empty-message">No one in queue</li>';
+                    let html = '<div class="empty-message">No one in queue</div>';
+                    
+                    // Always add "Create New Group" button if user is logged in and not active
+                    if (window.currentUser && !this.isUserActive()) {
+                        html += `
+                            <div class="create-group-container">
+                                <button class="create-group-button" data-court-id="${courtData.id}">
+                                    Create New Group
+                                </button>
+                            </div>
+                        `;
+                    }
+                    
+                    queueContainer.innerHTML = html;
+                    
+                    // Add click event listeners to create group buttons
+                    queueContainer.querySelectorAll('.create-group-button').forEach(button => {
+                        button.addEventListener('click', function() {
+                            const courtId = this.getAttribute('data-court-id');
+                            createNewGroup(courtId);
+                        });
+                    });
+                }
+            }
+            
+            // Update leave button visibility
+            const leaveButton = courtElement.querySelector('.leave-group-button');
+            if (leaveButton) {
+                const isUserInThisCourt = this.isUserInCourt(courtData);
+                leaveButton.style.display = isUserInThisCourt ? 'block' : 'none';
+            }
+        }
+    }
+
+    // Helper methods
+    isUserActive() {
+        if (!window.currentUser) return false;
+        
+        // Check all courts to see if user is in any group
+        return Object.values(this.courts || {}).some(court => {
+            return this.isUserInCourt(court);
+        });
+    }
+
+    isUserInCourt(courtData) {
+        if (!window.currentUser) return false;
+        
+        // Check active groups
+        if (courtData.active_groups) {
+            for (const group of courtData.active_groups) {
+                if (group.players.includes(window.currentUser)) {
+                    return true;
                 }
             }
         }
-
-        this.updateButtonStates(courts);
+        
+        // Check queue groups
+        if (courtData.queue_groups) {
+            for (const group of courtData.queue_groups) {
+                if (group.players.includes(window.currentUser)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     updateButtonStates(courts) {
@@ -132,6 +326,9 @@ class CourtManager {
         }
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
+        }
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
         }
     }
 }
