@@ -332,6 +332,7 @@ def leave_court(court_name):
         if user.queue_entry.court_id == court.id:
             for i, entry in enumerate(court.queue, 1):
                 entry.position = i
+        flash(f'You left the queue for {court.name}', 'warning')
 
     # Leave court if they’re on this court and timer is not running
     if user.court == court:
@@ -346,6 +347,7 @@ def leave_court(court_name):
                 db.session.delete(next_entry)
                 for i, entry in enumerate(court.queue[1:], 1):
                     entry.position = i
+            flash(f'You left the court for {court.name}', 'warning')
         else:
             flash('Cannot leave court while timer is running', 'error')
 

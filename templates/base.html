@@ -12,44 +12,50 @@
             top: 20px;
             right: 20px;
             z-index: 1000;
+            max-width: 80%;
+            width: 350px;
         }
 
         .flash-message {
             padding: 16px;
-            border-radius: 4px;
+            border-radius: 10px;
             margin-bottom: 10px;
-            animation: fadeIn 0.5s, fadeOut 0.5s 2.5s;
-            opacity: 0;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             color: white;
+            font-weight: 500;
+            opacity: 0; /* Start with opacity 0 for fade-in */
+            transform: translateX(30px); /* Start from right for fade-in */
+            transition: opacity 0.5s ease, transform 0.5s ease;
         }
 
         /* Different message types */
         .flash-message.success {
-            background-color: #4CAF50;  /* Green */
+            background-color: #34C759;  /* iOS Green */
         }
         
         .flash-message.error {
-            background-color: #f44336;  /* Red */
+            background-color: #FF3B30;  /* iOS Red */
         }
         
         .flash-message.warning {
-            background-color: #ff9800;  /* Orange */
+            background-color: #FF9500;  /* iOS Orange */
         }
 
         /* Default color if no category specified */
         .flash-message.message {
-            background-color: #2196F3;  /* Blue */
+            background-color: #007AFF;  /* iOS Blue */
         }
 
-        @keyframes fadeIn {
-            from {opacity: 0; transform: translateX(50px);}
-            to {opacity: 1; transform: translateX(0);}
+        /* For fade-in */
+        .flash-message.fade-in {
+            opacity: 1;
+            transform: translateX(0);
         }
 
-        @keyframes fadeOut {
-            from {opacity: 1; transform: translateX(0);}
-            to {opacity: 0; transform: translateX(50px);}
+        /* For fade-out */
+        .flash-message.fade-out {
+            opacity: 0;
+            transform: translateX(30px);
         }
     </style>
 </head>
@@ -96,16 +102,24 @@
         document.addEventListener('DOMContentLoaded', function() {
             const messages = document.querySelectorAll('.flash-message');
             messages.forEach(msg => {
-                msg.style.opacity = '1';
+                // Trigger reflow for animation to work
+                void msg.offsetWidth;
+                
+                // Fade in
+                msg.classList.add('fade-in');
+                
+                // Fade out after 4 seconds
                 setTimeout(() => {
-                    msg.style.opacity = '0';
+                    msg.classList.remove('fade-in');
+                    msg.classList.add('fade-out');
                     setTimeout(() => {
                         msg.remove();
                     }, 500);
-                }, 3000);
+                }, 4000);
             });
         });
     </script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
