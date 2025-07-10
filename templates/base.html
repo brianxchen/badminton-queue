@@ -74,6 +74,11 @@
                     <div class="user-indicator">
                         Signed in as: <span class="username">{{ session.user }}</span>
                     </div>
+                    
+                    {% if session.user and is_admin %}
+                        <a href="{{ url_for('admin') }}" class="admin-button">Admin Panel</a>
+                    {% endif %}
+                    
                     <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">🌙</button>
                     <a href="{{ url_for('logout') }}" class="nav-button">Sign Out</a>
                 {% else %}

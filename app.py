@@ -152,14 +152,24 @@ def inject_constants():
 def inject_utilities():
     club_state = ClubState.query.first()
     timer_state = TimerState.query.first()
+    
+    # Check if current user is admin
+    username = session.get('user')
+    is_admin = False
+    if username:
+        user = User.query.filter_by(username=username).first()
+        if user and user.is_admin:
+            is_admin = True
+            
     return {
         'MAX_PLAYERS': MAX_PLAYERS,
         'is_user_active_elsewhere': is_user_active_elsewhere,
         'club_state': club_state,
         'is_player_on_court': is_player_on_court,
         'timer_state': timer_state,
-        'is_user_on_court_or_queue': is_user_on_court_or_queue,  # Add this line
-        'signature': get_random_signature()
+        'is_user_on_court_or_queue': is_user_on_court_or_queue,
+        'signature': get_random_signature(),
+        'is_admin': is_admin 
     }
 
 
@@ -195,19 +205,22 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # app.logger.info("Login attempt")
         _username = request.form['username']
         _password = request.form['password']
 
         user = User.query.filter_by(username=_username).first()
         if user and check_password_hash(user.password_hash, _password):
             session['user'] = user.username
-            return redirect(url_for('home'))
+            
+            # If user is admin, redirect to admin panel
+            if user.is_admin:
+                return redirect(url_for('admin'))
+            else:
+                return redirect(url_for('home'))
         else:
             flash('Invalid username or password', 'error')
             return render_template('login.html', error='Invalid credentials')
     return render_template('login.html')
-
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -667,6 +680,20 @@ def court_updates():
             sleep(1)
     
     return Response(generate(), mimetype='text/event-stream')
+
+@app.route('/court-updates-poll')
+def court_updates_poll():
+    """Fallback endpoint for environments where SSE doesn't work"""
+    courts = Court.query.all()
+    
+    court_data = {}
+    for court in courts:
+        court_data[court.name] = {
+            'players': [player.username for player in court.players],
+            'queue': [entry.user.username for entry in court.queue]
+        }
+    
+    return jsonify({'courts': court_data})
 
 
 if __name__ == '__main__':
