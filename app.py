@@ -523,6 +523,30 @@ def set_timer_duration():
     except (TypeError, ValueError) as e:
         return jsonify({'error': 'Invalid duration format'}), 400
 
+@app.route('/timer/stop', methods=['POST'])
+def stop_timer():
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    user = User.query.filter_by(username=session['user']).first()
+    if not user or not user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    timer_state = TimerState.query.first()
+    if timer_state.is_running:
+        now = datetime.now().timestamp()
+        elapsed = now - timer_state.start_time
+        timer_state.remaining_time = max(0, timer_state.remaining_time - elapsed)
+        timer_state.is_running = False
+        timer_state.start_time = None
+        timer_state.end_time = None
+        db.session.commit()
+    
+    return jsonify({
+        'status': 'success',
+        'remaining': timer_state.remaining_time
+    })
+
 @app.route('/clear-courts', methods=['POST'])
 def clear_courts():
     username = session.get('user')

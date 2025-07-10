@@ -22,7 +22,7 @@
             
             <div class="timer-buttons">
                 <button onclick="startTimer()" class="timer-control-button start-button">Start</button>
-                <button onclick="stopTimer()" class="timer-control-button stop-button">Stop</button>
+                <button onclick="pauseTimer()" class="timer-control-button stop-button">Pause</button>
                 <button onclick="resetTimer()" class="timer-control-button reset-button">Reset</button>
             </div>
         </div>
@@ -157,14 +157,19 @@
     }
   }
 
-  async function stopTimer() {
+  async function pauseTimer() {
     try {
-      const response = await fetch('/timer/stop', { method: 'POST' });
+      const response = await fetch('/timer/stop', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       if (response.ok) {
         updateTimerDisplay();
       }
     } catch (error) {
-      console.error('Error stopping timer:', error);
+      console.error('Error pausing timer:', error);
     }
   }
 
