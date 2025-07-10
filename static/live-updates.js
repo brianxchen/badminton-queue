@@ -107,7 +107,7 @@ class CourtManager {
                                     courtData.queue.includes(window.currentUser);
             const leaveButton = courtElement.querySelector('.danger-button');
             if (leaveButton) {
-                leaveButton.style.display = isUserOnThisCourt ? 'block' : 'none';
+                leaveButton.classList.toggle('hidden', !isUserOnThisCourt);
             }
         });
     }

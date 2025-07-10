@@ -73,14 +73,14 @@
             Join Queue
           </button>
         </form>
-        
+
         <form action="{{ url_for('leave_court', court_name=court.name) }}" method="POST" class="inline-form">
             <button 
-              type="submit" 
-              class="danger-button" 
-              {% if user_is_on_this_court_or_queue %}style="display:block;"{% else %}style="display:none;"{% endif %}>
-              Leave
+            type="submit" 
+            class="danger-button {% if not user_is_on_this_court_or_queue %}hidden{% endif %}">
+            Leave
             </button>
+
           </form>
           
       </div>

@@ -121,6 +121,10 @@ button:disabled {
     background-color: var(--system-red);
 }
 
+.danger-button.hidden {
+    display: none;
+  }  
+
 #theme-toggle {
     background: none;
     color: var(--text-primary);
