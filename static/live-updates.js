@@ -9,6 +9,9 @@ class CourtManager {
         
         this.initializeEventSource();
         this.initializeTimer();
+        
+        // Add global click handler for closing leave buttons
+        this.setupGlobalClickHandler();
     }
 
     initializeEventSource() {
@@ -467,6 +470,9 @@ class CourtManager {
         if (this.pollingInterval) {
             clearInterval(this.pollingInterval);
         }
+        
+        // Remove the global click handler
+        document.removeEventListener('click', this.documentClickHandler);
     }
 
     generatePlayerSlotHTML(player, group) {
@@ -567,35 +573,8 @@ class CourtManager {
                     }
                 }
                 
-                // Add a click handler to the document to close the button when clicking elsewhere
-                const closeLeaveButton = function(event) {
-                    if (!newSlot.contains(event.target)) {
-                        // Add transitions for smooth animation when closing
-                        newSlot.classList.add('allow-transitions');
-                        
-                        // Remove the class without animation
-                        newSlot.classList.remove('show-leave-button');
-                        
-                        // Update the global state
-                        if (window.activeLeaveSlots && playerName) {
-                            window.activeLeaveSlots.delete(playerName);
-                        }
-                        
-                        document.removeEventListener('click', closeLeaveButton);
-                        
-                        // Remove the transitions class after animation completes
-                        setTimeout(() => {
-                            newSlot.classList.remove('allow-transitions');
-                        }, 300);
-                    }
-                };
-                
-                // Add the document click handler with a slight delay to avoid immediate triggering
-                if (this.classList.contains('show-leave-button')) {
-                    setTimeout(() => {
-                        document.addEventListener('click', closeLeaveButton);
-                    }, 10);
-                }
+                // Stop event propagation to prevent immediate closing
+                e.stopPropagation();
             });
         });
         
@@ -622,14 +601,45 @@ class CourtManager {
                 }, 100);
             });
         }, 50);
+    }
 
-        // Apply allow-transitions class to ALL my-slot elements that need it
-        // This ensures both active court slots and queue slots get transitions
-        setTimeout(() => {
-            document.querySelectorAll('.player-slot.my-slot:hover, .player-slot.my-slot.show-leave-button').forEach(slot => {
+    setupGlobalClickHandler() {
+        // Remove any existing handlers with the same name to prevent duplicates
+        document.removeEventListener('click', this.documentClickHandler);
+        
+        // Define the handler as a property of the instance so we can remove it later
+        this.documentClickHandler = (event) => {
+            // Find any open leave buttons
+            const openLeaveButtons = document.querySelectorAll('.player-slot.my-slot.show-leave-button');
+            
+            // If there are open buttons, check if the click was outside them
+            openLeaveButtons.forEach(slot => {
+                // Skip if the click was inside the slot
+                if (slot.contains(event.target)) {
+                    return;
+                }
+                
+                // For closing, add transitions
                 slot.classList.add('allow-transitions');
+                
+                // Close the button
+                slot.classList.remove('show-leave-button');
+                
+                // Update global state
+                const playerName = slot.querySelector('.player-name')?.textContent;
+                if (playerName && window.activeLeaveSlots) {
+                    window.activeLeaveSlots.delete(playerName);
+                }
+                
+                // Remove transitions after animation completes
+                setTimeout(() => {
+                    slot.classList.remove('allow-transitions');
+                }, 300);
             });
-        }, 150); // Slightly longer delay to ensure DOM is stable
+        };
+        
+        // Add the handler to the document
+        document.addEventListener('click', this.documentClickHandler);
     }
 }
 

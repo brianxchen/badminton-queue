@@ -110,7 +110,7 @@
 {% block scripts %}
 <script>
 window.currentUser = "{{ session.user if session.user else '' }}";
-window.MAX_PLAYERS = {{ MAX_PLAYERS|tojson }};
+window.MAX_PLAYERS = {{ MAX_PLAYERS }};
 
 function updateTimerDisplay() {
   fetch('/timer/status')
@@ -134,6 +134,56 @@ function formatTime(seconds) {
 
 // Add event listeners for joining slots and creating groups
 document.addEventListener('DOMContentLoaded', function() {
+  // Global click handler to close leave buttons when clicking elsewhere
+  document.addEventListener('click', function(event) {
+    // Find any open leave buttons
+    const openLeaveButtons = document.querySelectorAll('.player-slot.my-slot.show-leave-button');
+    
+    // If there are open buttons, check if the click was outside them
+    openLeaveButtons.forEach(slot => {
+      // If the click was outside this slot, close the leave button
+      if (!slot.contains(event.target)) {
+        slot.classList.remove('show-leave-button');
+        
+        // Update global state
+        const playerName = slot.querySelector('.player-name')?.textContent;
+        if (playerName && window.activeLeaveSlots) {
+          window.activeLeaveSlots.delete(playerName);
+        }
+      }
+    });
+  });
+  
+  // Handle taps on player slots
+  document.querySelectorAll('.player-slot.my-slot').forEach(slot => {
+    slot.addEventListener('click', function(e) {
+      // Don't toggle if clicking directly on the leave button
+      if (e.target.classList.contains('leave-button')) {
+        return;
+      }
+      
+      // Toggle the show-leave-button class
+      this.classList.toggle('show-leave-button');
+      
+      // Store this state globally to persist through updates
+      const playerName = this.querySelector('.player-name')?.textContent;
+      if (playerName) {
+        if (!window.activeLeaveSlots) {
+          window.activeLeaveSlots = new Set();
+        }
+        
+        if (this.classList.contains('show-leave-button')) {
+          window.activeLeaveSlots.add(playerName);
+        } else {
+          window.activeLeaveSlots.delete(playerName);
+        }
+      }
+      
+      // Stop event propagation to prevent the document click handler from immediately closing it
+      e.stopPropagation();
+    });
+  });
+  
   // Handle empty slot clicks to join a group
   document.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
     slot.addEventListener('click', function() {
