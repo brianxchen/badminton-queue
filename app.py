@@ -4,6 +4,7 @@ from datetime import timedelta, datetime
 import time
 import json
 import random
+from gevent import sleep
 
 # Flask alchemy for database
 from flask_sqlalchemy import SQLAlchemy
@@ -334,6 +335,7 @@ def admin():
                          courts=courts,
                          users=users)  # Pass users to the template
 
+
 @app.route('/timer/start', methods=['POST'])
 def start_timer():
     if 'user' not in session:
@@ -553,7 +555,7 @@ def court_updates():
                     }
                 data = f"data: {json.dumps({'courts': court_data})}\n\n"
                 yield data
-            time.sleep(1)
+            sleep(1)
     
     return Response(generate(), mimetype='text/event-stream')
 
