@@ -56,30 +56,42 @@ class CourtManager {
             // Update players list
             const playersUl = courtElement.querySelector('.current-players');
             if (playersUl) {
-                playersUl.innerHTML = courtData.players
-                    .map(player => `
-                        <li>
-                            <span class="player-name">${player}</span>
-                            ${player === window.currentUser ? 
-                                '<span class="player-indicator">You</span>' : 
-                                ''}
-                        </li>
-                    `).join('');
+                // Important: Add check for if the array exists AND has length
+                if (Array.isArray(courtData.players) && courtData.players.length > 0) {
+                    playersUl.innerHTML = courtData.players
+                        .map(player => `
+                            <li>
+                                <span class="player-name">${player}</span>
+                                ${player === window.currentUser ? 
+                                    '<span class="player-indicator">You</span>' : 
+                                    ''}
+                            </li>
+                        `).join('');
+                } else {
+                    // Always show the empty message when no players
+                    playersUl.innerHTML = '<li class="empty-message">No players currently on court</li>';
+                }
             }
 
             // Update queue list with numbers
             const queueUl = courtElement.querySelector('.queue');
             if (queueUl) {
-                queueUl.innerHTML = courtData.queue
-                    .map((player, index) => `
-                        <li>
-                            <span class="queue-number">${index + 1}</span>
-                            <span class="player-name">${player}</span>
-                            ${player === window.currentUser ? 
-                                '<span class="player-indicator">You</span>' : 
-                                ''}
-                        </li>
-                    `).join('');
+                // Important: Add check for if the array exists AND has length
+                if (Array.isArray(courtData.queue) && courtData.queue.length > 0) {
+                    queueUl.innerHTML = courtData.queue
+                        .map((player, index) => `
+                            <li>
+                                <span class="queue-number">${index + 1}</span>
+                                <span class="player-name">${player}</span>
+                                ${player === window.currentUser ? 
+                                    '<span class="player-indicator">You</span>' : 
+                                    ''}
+                            </li>
+                        `).join('');
+                } else {
+                    // Always show the empty message when no queue entries
+                    queueUl.innerHTML = '<li class="empty-message">No one in queue</li>';
+                }
             }
         }
 
@@ -90,8 +102,8 @@ class CourtManager {
         if (!window.currentUser) return;
         
         const isUserActive = Object.values(courts).some(court => 
-            court.players.includes(window.currentUser) || 
-            court.queue.includes(window.currentUser)
+            (Array.isArray(court.players) && court.players.includes(window.currentUser)) || 
+            (Array.isArray(court.queue) && court.queue.includes(window.currentUser))
         );
 
         document.querySelectorAll('.join-button').forEach(button => {
@@ -103,8 +115,10 @@ class CourtManager {
             const courtElement = document.getElementById(courtId);
             if (!courtElement) return;
 
-            const isUserOnThisCourt = courtData.players.includes(window.currentUser) || 
-                                    courtData.queue.includes(window.currentUser);
+            const isUserOnThisCourt = 
+                (Array.isArray(courtData.players) && courtData.players.includes(window.currentUser)) || 
+                (Array.isArray(courtData.queue) && courtData.queue.includes(window.currentUser));
+                
             const leaveButton = courtElement.querySelector('.danger-button');
             if (leaveButton) {
                 leaveButton.classList.toggle('hidden', !isUserOnThisCourt);
@@ -162,5 +176,13 @@ async function toggleClubStatus() {
     } catch (error) {
         console.error('Error toggling club status:', error);
         alert('Failed to toggle club status');
+    }
+}
+
+// Initialize event listener for updates 
+function initLiveUpdates() {
+    // This function is called from base.html
+    if (!courtManager) {
+        courtManager = new CourtManager();
     }
 }
