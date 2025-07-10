@@ -467,13 +467,93 @@ button:disabled {
 }
 
 .flash-message {
-    padding: 12px;
-    margin-bottom: 16px;
-    border-radius: 10px;
-    background: var(--background-secondary);
-    color: var(--text-primary);
-    font-size: 15px;
-    text-align: center;
+  padding: 12px 16px;  /* Slightly smaller padding */
+  border-radius: 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  color: white;
+  font-size: 14px;  /* Smaller font */
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(20px);  /* Come from bottom instead */
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  text-align: left; /* Left align text */
+}
+
+/* Add subtle icons to different message types */
+.flash-message::before {
+  content: "";
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.flash-message.success::before {
+  content: "✓";
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.flash-message.error::before {
+  content: "✕";
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.flash-message.warning::before {
+  content: "!";
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.flash-message.message::before {
+  content: "i";
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+/* Fade in from bottom */
+.flash-message.fade-in {
+  opacity: 0.95;  /* Not fully opaque */
+  transform: translateY(0);
+}
+
+/* Fade out to bottom */
+.flash-message.fade-out {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.flash-messages {
+  position: fixed;
+  bottom: 20px;  /* Move to bottom instead of top */
+  right: 20px;
+  z-index: 1000;
+  max-width: 80%;
+  width: 300px;  /* Smaller width */
 }
 
 .footer {

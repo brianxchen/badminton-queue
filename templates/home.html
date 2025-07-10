@@ -110,7 +110,7 @@
 {% block scripts %}
 <script>
 window.currentUser = "{{ session.user if session.user else '' }}";
-window.MAX_PLAYERS = {{ MAX_PLAYERS }};
+window.MAX_PLAYERS = {{ MAX_PLAYERS }};  // Fix the variable substitution
 
 function updateTimerDisplay() {
   fetch('/timer/status')
@@ -202,6 +202,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function joinGroup(groupId) {
+  // Disable the clicked slot
+  const clickedSlot = document.querySelector(`.player-slot.empty[data-group-id="${groupId}"]`);
+  if (clickedSlot) {
+    clickedSlot.style.opacity = '0.5';
+    clickedSlot.style.pointerEvents = 'none';
+  }
+
   fetch(`/join-slot/${groupId}`, {
     method: 'POST',
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -217,15 +224,34 @@ function joinGroup(groupId) {
       location.reload();
     } else {
       showFlashMessage(data.message, 'error');
+      
+      // Re-enable the slot if there was an error
+      if (clickedSlot) {
+        clickedSlot.style.opacity = '';
+        clickedSlot.style.pointerEvents = '';
+      }
     }
   })
   .catch(error => {
     console.error('Error joining group:', error);
     showFlashMessage('Error joining group', 'error');
+    
+    // Re-enable the slot if there was an error
+    if (clickedSlot) {
+      clickedSlot.style.opacity = '';
+      clickedSlot.style.pointerEvents = '';
+    }
   });
 }
 
 function createNewGroup(courtId) {
+  // Disable the clicked button
+  const clickedButton = document.querySelector(`.create-group-button[data-court-id="${courtId}"]`);
+  if (clickedButton) {
+    clickedButton.disabled = true;
+    clickedButton.textContent = 'Creating...';
+  }
+
   fetch(`/create-new-group/${courtId}`, {
     method: 'POST',
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -241,15 +267,33 @@ function createNewGroup(courtId) {
       location.reload();
     } else {
       showFlashMessage(data.message, 'error');
+      
+      // Re-enable the button if there was an error
+      if (clickedButton) {
+        clickedButton.disabled = false;
+        clickedButton.textContent = 'Create New Group';
+      }
     }
   })
   .catch(error => {
     console.error('Error creating group:', error);
     showFlashMessage('Error creating group', 'error');
+    
+    // Re-enable the button if there was an error
+    if (clickedButton) {
+      clickedButton.disabled = false;
+      clickedButton.textContent = 'Create New Group';
+    }
   });
 }
 
 function leaveGroup() {
+  // Disable all leave buttons
+  document.querySelectorAll('.leave-button').forEach(button => {
+    button.disabled = true;
+    button.textContent = 'Leaving...';
+  });
+
   fetch('/leave-group', {
     method: 'POST',
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -265,11 +309,23 @@ function leaveGroup() {
       location.reload();
     } else {
       showFlashMessage(data.message, 'error');
+      
+      // Re-enable all leave buttons if there was an error
+      document.querySelectorAll('.leave-button').forEach(button => {
+        button.disabled = false;
+        button.textContent = 'Leave';
+      });
     }
   })
   .catch(error => {
     console.error('Error leaving group:', error);
     showFlashMessage('Error leaving group', 'error');
+    
+    // Re-enable all leave buttons if there was an error
+    document.querySelectorAll('.leave-button').forEach(button => {
+      button.disabled = false;
+      button.textContent = 'Leave';
+    });
   });
 }
 
@@ -277,23 +333,29 @@ function showFlashMessage(message, category) {
   const flashContainer = document.getElementById('flashMessages');
   const msgElement = document.createElement('div');
   msgElement.className = `flash-message ${category}`;
+  
+  // Create message content with truncation if needed
+  if (message.length > 60) {
+    message = message.substring(0, 57) + '...';
+  }
+  
   msgElement.textContent = message;
   
   flashContainer.appendChild(msgElement);
   
-  // Set color based on category
+  // Set color based on category - using more subtle, transparent colors
   switch(category) {
     case 'success':
-      msgElement.style.backgroundColor = '#34C759'; // iOS Green
+      msgElement.style.backgroundColor = 'rgba(52, 199, 89, 0.9)'; // iOS Green with transparency
       break;
     case 'error':
-      msgElement.style.backgroundColor = '#FF3B30'; // iOS Red
+      msgElement.style.backgroundColor = 'rgba(255, 59, 48, 0.9)'; // iOS Red with transparency
       break;
     case 'warning':
-      msgElement.style.backgroundColor = '#FF9500'; // iOS Orange
+      msgElement.style.backgroundColor = 'rgba(255, 149, 0, 0.9)'; // iOS Orange with transparency
       break;
     default:
-      msgElement.style.backgroundColor = '#007AFF'; // iOS Blue
+      msgElement.style.backgroundColor = 'rgba(0, 122, 255, 0.9)'; // iOS Blue with transparency
       break;
   }
   
@@ -303,14 +365,14 @@ function showFlashMessage(message, category) {
   // Fade in
   msgElement.classList.add('fade-in');
   
-  // Fade out after 4 seconds
+  // Fade out after 3 seconds (shorter time)
   setTimeout(() => {
     msgElement.classList.remove('fade-in');
     msgElement.classList.add('fade-out');
     setTimeout(() => {
       msgElement.remove();
-    }, 500);
-  }, 4000);
+    }, 300);
+  }, 2000);  // Show for only 2 seconds
 }
 
 setInterval(updateTimerDisplay, 1000);

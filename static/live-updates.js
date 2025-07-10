@@ -696,6 +696,14 @@ function initLiveUpdates() {
     if (!courtManager) {
         courtManager = new CourtManager();
     }
+    
+    // Ensure the flash container exists
+    if (!document.getElementById('flashMessages')) {
+        const container = document.createElement('div');
+        container.id = 'flashMessages';
+        container.className = 'flash-messages';
+        document.body.appendChild(container);
+    }
 }
 
 function createNewGroup(courtId) {
@@ -790,11 +798,20 @@ function joinGroup(groupId) {
   .then(response => response.json())
   .then(data => {
     if (data.success) {
+      // Call showFlashMessage directly 
       showFlashMessage(data.message, 'success');
+      console.log('Join success message:', data.message); // Debug log
+      
+      // Force an immediate refresh of the display
       sessionStorage.setItem('forceUpdate', 'true');
-      location.reload();
+      
+      // Small delay before reload to allow message to be seen
+      setTimeout(() => {
+        location.reload();
+      }, 300);
     } else {
       showFlashMessage(data.message, 'error');
+      console.log('Join error message:', data.message); // Debug log
       resetInteractionState(actionId, clickedSlot);
     }
   })
@@ -984,3 +1001,149 @@ async function refreshCourts() {
     console.error('Error refreshing courts:', error);
   }
 }
+
+// Create a brand new showFlashMessage function with a completely different approach
+function showFlashMessage(message, category) {
+  // First, find or create the container
+  let flashContainer = document.getElementById('flashMessages');
+  if (!flashContainer) {
+    flashContainer = document.createElement('div');
+    flashContainer.id = 'flashMessages';
+    flashContainer.style.position = 'fixed';
+    flashContainer.style.bottom = '20px';
+    flashContainer.style.right = '20px';
+    flashContainer.style.zIndex = '10000';
+    flashContainer.style.width = '300px';
+    document.body.appendChild(flashContainer);
+  }
+  
+  // Create a unique ID for this message
+  const messageId = 'flash-' + Date.now();
+  
+  // Select background color based on category
+  let backgroundColor;
+  let icon;
+  switch(category) {
+    case 'success':
+      backgroundColor = '#34C759'; // Solid color, no transparency
+      icon = "✓";
+      break;
+    case 'error':
+      backgroundColor = '#FF3B30';
+      icon = "✕";
+      break;
+    case 'warning':
+      backgroundColor = '#FF9500';
+      icon = "!";
+      break;
+    default:
+      backgroundColor = '#007AFF';
+      icon = "i";
+      break;
+  }
+  
+  // Truncate long messages
+  if (message.length > 60) {
+    message = message.substring(0, 57) + '...';
+  }
+  
+  // Build HTML for the message
+  const html = `
+    <div id="${messageId}" style="
+      background-color: ${backgroundColor};
+      color: white;
+      padding: 12px 16px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      transform: translateY(20px);
+    ">
+      <span style="
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        margin-right: 10px;
+        background-color: rgba(255,255,255,0.2);
+        border-radius: 50%;
+        font-size: 12px;
+      ">${icon}</span>
+      <span>${message}</span>
+    </div>
+  `;
+  
+  // Insert HTML into container
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = html;
+  const messageElement = tempDiv.firstElementChild;
+  flashContainer.appendChild(messageElement);
+  
+  // Force browser to recognize the element
+  void messageElement.offsetWidth;
+  
+  // Show message with no animation (direct style manipulation)
+  messageElement.style.transition = 'opacity 300ms ease, transform 300ms ease';
+  
+  // Force the browser to apply the transition property before changing opacity
+  setTimeout(() => {
+    messageElement.style.opacity = '1';
+    messageElement.style.transform = 'translateY(0)';
+  }, 10);
+  
+  // Hide and remove message after 2 seconds
+  setTimeout(() => {
+    messageElement.style.opacity = '0';
+    messageElement.style.transform = 'translateY(20px)';
+    
+    setTimeout(() => {
+      messageElement.remove();
+    }, 300);
+  }, 2000);
+}
+
+// Remove any conflicting CSS - add this to DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Create a style tag to override any conflicting styles
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Override any existing flash message styles in CSS */
+    .flash-message, .flash-message.success, .flash-message.error, 
+    .flash-message.warning, .flash-message.message {
+      background-color: transparent !important;
+      color: inherit !important;
+      transition: none !important;
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+    
+    /* Ensure the flash container always has the correct position */
+    #flashMessages {
+      position: fixed !important;
+      bottom: 20px !important;
+      right: 20px !important;
+      z-index: 10000 !important;
+      max-width: 80% !important;
+      width: 300px !important;
+    }
+  `;
+  document.head.appendChild(style);
+  
+  // Force create the container
+  if (!document.getElementById('flashMessages')) {
+    const container = document.createElement('div');
+    container.id = 'flashMessages';
+    container.style.position = 'fixed';
+    container.style.bottom = '20px';
+    container.style.right = '20px';
+    container.style.zIndex = '10000';
+    container.style.width = '300px';
+    document.body.appendChild(container);
+  }
+});

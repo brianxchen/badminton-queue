@@ -7,56 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <style>
-        .flash-messages {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            max-width: 80%;
-            width: 350px;
-        }
-
-        .flash-message {
-            padding: 16px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            color: white;
-            font-weight: 500;
-            opacity: 0; /* Start with opacity 0 for fade-in */
-            transform: translateX(30px); /* Start from right for fade-in */
-            transition: opacity 0.5s ease, transform 0.5s ease;
-        }
-
-        /* Different message types - using iOS colors */
-        .flash-message.success {
-            background-color: #34C759 !important;  /* iOS Green */
-        }
-        
-        .flash-message.error {
-            background-color: #FF3B30 !important;  /* iOS Red */
-        }
-        
-        .flash-message.warning {
-            background-color: #FF9500 !important;  /* iOS Orange */
-        }
-
-        /* Default color if no category specified */
-        .flash-message.message {
-            background-color: #007AFF !important;  /* iOS Blue */
-        }
-
-        /* For fade-in */
-        .flash-message.fade-in {
-            opacity: 1;
-            transform: translateX(0);
-        }
-
-        /* For fade-out */
-        .flash-message.fade-out {
-            opacity: 0;
-            transform: translateX(30px);
-        }
+        /* Flash message styles are now fully defined in styles.css */
     </style>
 </head>
 <body>
@@ -113,14 +64,14 @@
                 // Fade in
                 msg.classList.add('fade-in');
                 
-                // Fade out after 4 seconds
+                // Fade out after 2 seconds
                 setTimeout(() => {
                     msg.classList.remove('fade-in');
                     msg.classList.add('fade-out');
                     setTimeout(() => {
                         msg.remove();
-                    }, 500);
-                }, 4000);
+                    }, 300);
+                }, 2000);
             });
         });
     </script>
