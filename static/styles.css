@@ -1066,3 +1066,46 @@ button:disabled {
   margin-top: 16px;
   width: 100%;
 }
+
+/* Add these styles for the admin panel's group display */
+
+.admin-group-card, .admin-queue-group {
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.admin-group-header, .admin-queue-header {
+  padding: 8px 12px;
+  background-color: var(--system-blue);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.admin-queue-header .queue-number {
+  background-color: white;
+  color: var(--system-blue);
+  margin-right: 6px;
+}
+
+.admin-group-members, .admin-queue-members {
+  padding: 8px;
+}
+
+.admin-group-members .player-item, 
+.admin-queue-members .player-item {
+  background-color: var(--background-primary);
+  margin-bottom: 4px;
+  border-left: 3px solid var(--system-green);
+}
+
+.admin-group-members .empty-admin-message,
+.admin-queue-members .empty-admin-message {
+  background-color: var(--background-primary);
+  font-size: 13px;
+  padding: 6px 10px;
+}

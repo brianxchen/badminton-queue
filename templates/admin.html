@@ -52,31 +52,56 @@
                 <h3>{{ court.name }}</h3>
                 
                 <div class="court-admin-info">
+                    <!-- Active groups on court -->
                     <div class="court-admin-players">
                         <h4>Current Players</h4>
                         <div class="player-list">
-                            {% if court.players %}
-                                {% for player in court.players %}
-                                    <div class="player-item">{{ player.username }}</div>
+                            {% set active_groups = court.groups|selectattr('is_in_queue', 'equalto', False)|list %}
+                            {% if active_groups %}
+                                {% for group in active_groups %}
+                                    <div class="admin-group-card">
+                                        <div class="admin-group-header">Group</div>
+                                        <div class="admin-group-members">
+                                            {% if group.players %}
+                                                {% for player in group.players %}
+                                                    <div class="player-item">{{ player.username }}</div>
+                                                {% endfor %}
+                                            {% else %}
+                                                <div class="empty-admin-message">No players in this group</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
                                 {% endfor %}
                             {% else %}
-                                <div class="empty-admin-message">No players</div>
+                                <div class="empty-admin-message">No active groups</div>
                             {% endif %}
                         </div>
                     </div>
                     
+                    <!-- Queue groups -->
                     <div class="court-admin-queue">
                         <h4>Queue</h4>
                         <div class="queue-list">
-                            {% if court.queue %}
-                                {% for entry in court.queue | sort(attribute='position') %}
-                                    <div class="queue-item">
-                                        <span class="queue-number">{{ entry.position }}</span>
-                                        {{ entry.user.username }}
+                            {% set queue_groups = court.groups|selectattr('is_in_queue', 'equalto', True)|sort(attribute='queue_position') %}
+                            {% if queue_groups %}
+                                {% for group in queue_groups %}
+                                    <div class="admin-queue-group">
+                                        <div class="admin-queue-header">
+                                            <span class="queue-number">{{ group.queue_position }}</span>
+                                        </div>
+                                        <div class="admin-queue-members">
+                                            {% if group.players %}
+                                                {% for player in group.players %}
+                                                    <div class="player-item">{{ player.username }}</div>
+                                                {% endfor %}
+                                            {% else %}
+                                                <div class="empty-admin-message">Empty group</div>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 {% endfor %}
                             {% else %}
-                                <div class="empty-admin-message">No queue</div>
+                                <div class="empty-admin-message">No queue groups</div>
                             {% endif %}
                         </div>
                     </div>
@@ -182,7 +207,7 @@
   }
 
   async function clearCourts() {
-    if (!confirm('Are you sure you want to clear all courts? This will remove all players.')) {
+    if (!confirm('Are you sure you want to clear all courts? This will remove all players from all groups.')) {
       return;
     }
     try {
