@@ -3,6 +3,10 @@ class CourtManager {
         this.connectionAttempts = 0;
         this.maxConnectionAttempts = 5;
         this.retryInterval = 3000; // 3 seconds
+        
+        // Initialize global state for persistent mobile click state
+        window.activeLeaveSlots = new Set();
+        
         this.initializeEventSource();
         this.initializeTimer();
     }
@@ -16,7 +20,23 @@ class CourtManager {
             try {
                 const data = JSON.parse(event.data);
                 if (data.courts) {
-                    this.updateCourtsDisplay(data.courts);
+                    // First check if any user is interacting with the leave button
+                    const userInteracting = document.querySelector('.player-slot.my-slot:hover, .player-slot.my-slot.show-leave-button');
+                    if (userInteracting) {
+                        console.log("User is interacting with a leave button, skipping update");
+                        return; // Skip update if user is interacting
+                    }
+                    
+                    // Store the previous court data to compare
+                    const prevCourtData = JSON.stringify(this.courts || {});
+                    const newCourtData = JSON.stringify(data.courts);
+                    
+                    // Only update if the data has actually changed
+                    if (prevCourtData !== newCourtData) {
+                        this.updateCourtsDisplay(data.courts);
+                    } else {
+                        console.log("Court data unchanged, skipping update");
+                    }
                 }
             } catch (err) {
                 console.error("Error parsing SSE data:", err);
@@ -195,14 +215,7 @@ class CourtManager {
                         
                         // Add occupied slots
                         group.players.forEach(player => {
-                            queueHTML += `
-                                <div class="player-slot occupied ${player === window.currentUser ? 'my-slot' : ''}">
-                                    <span class="player-name">${player}</span>
-                                    ${player === window.currentUser ? 
-                                        '<span class="player-indicator">You</span><button class="leave-button" onclick="leaveGroup()">Leave</button>' : 
-                                        ''}
-                                </div>
-                            `;
+                            queueHTML += this.generatePlayerSlotHTML(player, group);
                         });
                         
                         // Add empty slots
@@ -273,12 +286,14 @@ class CourtManager {
                 return true;
             }
             
-            // Check if user is hovering over their slot - if so, don't update while hovering
-            const userSlot = container.querySelector('.player-slot.my-slot:hover');
-            if (userSlot) {
-                return false;
+            // Check for ANY user interactions globally before doing any updates
+            const anyUserSlot = document.querySelector('.player-slot.my-slot:hover, .player-slot.my-slot.show-leave-button');
+            if (anyUserSlot) {
+                console.log("User is interacting somewhere, preventing ALL updates");
+                return false; // Don't update anything if user is interacting with any slot
             }
             
+            // If we get here, check if content has actually changed
             // Check if number of groups changed
             const currentGroupElements = container.querySelectorAll('.player-group');
             if (!groups || currentGroupElements.length !== groups.length) return true;
@@ -456,8 +471,11 @@ class CourtManager {
 
     generatePlayerSlotHTML(player, group) {
         const isCurrentUser = player === window.currentUser;
+        const isActive = window.activeLeaveSlots && window.activeLeaveSlots.has(player);
+        
+        // Use the same HTML structure for both court and queue player slots
         return `
-            <div class="player-slot occupied ${isCurrentUser ? 'my-slot' : ''}">
+            <div class="player-slot occupied ${isCurrentUser ? 'my-slot' : ''} ${isActive ? 'show-leave-button' : ''}">
                 <span class="player-name">${player}</span>
                 ${isCurrentUser ? 
                     '<span class="player-indicator">You</span><button class="leave-button" onclick="leaveGroup()">Leave</button>' : 
@@ -467,9 +485,17 @@ class CourtManager {
     }
 
     reattachEventListeners() {
-        // First, remove existing event listeners by cloning and replacing elements
-        
-        // Handle empty slot clicks to join a group
+        // First, create a temporary class on the body to suppress animations
+        document.body.classList.add('suppress-animations');
+
+        // Remember which slots had show-leave-button class
+        const activeSlots = new Set();
+        document.querySelectorAll('.player-slot.my-slot.show-leave-button').forEach(slot => {
+            const player = slot.querySelector('.player-name')?.textContent;
+            if (player) activeSlots.add(player);
+        });
+
+        // Handle empty slot clicks
         document.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
             const newSlot = slot.cloneNode(true);
             slot.parentNode.replaceChild(newSlot, slot);
@@ -494,28 +520,73 @@ class CourtManager {
         // Handle tap on user's own slot for mobile
         document.querySelectorAll('.player-slot.my-slot').forEach(slot => {
             const newSlot = slot.cloneNode(true);
+            
+            // First, restore previous state if needed
+            const player = slot.querySelector('.player-name')?.textContent;
+            if (player && activeSlots.has(player)) {
+                newSlot.classList.add('show-leave-button');
+            }
+            
             slot.parentNode.replaceChild(newSlot, slot);
             
             // Re-add the leave button click handler
             const leaveButton = newSlot.querySelector('.leave-button');
             if (leaveButton) {
-                leaveButton.onclick = () => leaveGroup();
+                leaveButton.onclick = (e) => {
+                    e.stopPropagation(); // Prevent the slot's click handler from firing
+                    leaveGroup();
+                };
             }
             
+            // Click handler for showing/hiding leave button
             newSlot.addEventListener('click', function(e) {
                 // Don't toggle if clicking directly on the leave button
                 if (e.target.classList.contains('leave-button')) {
                     return;
                 }
                 
+                // Add the allow-transitions class before toggling
+                // This enables smooth animation
+                this.classList.add('allow-transitions');
+                
                 // Toggle the show-leave-button class
                 this.classList.toggle('show-leave-button');
+                
+                // Store this state globally to persist through updates
+                const playerName = this.querySelector('.player-name')?.textContent;
+                if (playerName) {
+                    if (this.classList.contains('show-leave-button')) {
+                        // Store which slots have show-leave-button active
+                        window.activeLeaveSlots = window.activeLeaveSlots || new Set();
+                        window.activeLeaveSlots.add(playerName);
+                    } else {
+                        // Remove from the set if the class is toggled off
+                        if (window.activeLeaveSlots) {
+                            window.activeLeaveSlots.delete(playerName);
+                        }
+                    }
+                }
                 
                 // Add a click handler to the document to close the button when clicking elsewhere
                 const closeLeaveButton = function(event) {
                     if (!newSlot.contains(event.target)) {
+                        // Add transitions for smooth animation when closing
+                        newSlot.classList.add('allow-transitions');
+                        
+                        // Remove the class without animation
                         newSlot.classList.remove('show-leave-button');
+                        
+                        // Update the global state
+                        if (window.activeLeaveSlots && playerName) {
+                            window.activeLeaveSlots.delete(playerName);
+                        }
+                        
                         document.removeEventListener('click', closeLeaveButton);
+                        
+                        // Remove the transitions class after animation completes
+                        setTimeout(() => {
+                            newSlot.classList.remove('allow-transitions');
+                        }, 300);
                     }
                 };
                 
@@ -527,6 +598,38 @@ class CourtManager {
                 }
             });
         });
+        
+        // Apply active states after all event listeners are attached
+        if (window.activeLeaveSlots && window.activeLeaveSlots.size > 0) {
+            document.querySelectorAll('.player-slot.my-slot').forEach(slot => {
+                const playerName = slot.querySelector('.player-name')?.textContent;
+                if (playerName && window.activeLeaveSlots.has(playerName)) {
+                    // Don't animate when restoring state during updates
+                    slot.classList.add('show-leave-button');
+                }
+            });
+        }
+        
+        // Re-enable animations after a short delay
+        setTimeout(() => {
+            document.body.classList.remove('suppress-animations');
+            
+            // Add the allow-transitions class to slots that need it
+            document.querySelectorAll('.player-slot.my-slot:hover, .player-slot.my-slot.show-leave-button').forEach(slot => {
+                // Short delay to prevent animation on page load/update
+                setTimeout(() => {
+                    slot.classList.add('allow-transitions');
+                }, 100);
+            });
+        }, 50);
+
+        // Apply allow-transitions class to ALL my-slot elements that need it
+        // This ensures both active court slots and queue slots get transitions
+        setTimeout(() => {
+            document.querySelectorAll('.player-slot.my-slot:hover, .player-slot.my-slot.show-leave-button').forEach(slot => {
+                slot.classList.add('allow-transitions');
+            });
+        }, 150); // Slightly longer delay to ensure DOM is stable
     }
 }
 

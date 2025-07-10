@@ -751,9 +751,12 @@ def get_club_status():
         'last_modified': club_state.last_modified.timestamp()
     })
 
+import hashlib
+
 @app.route('/court-updates')
 def court_updates():
     def generate():
+        last_hash = None
         while True:
             with app.app_context():
                 courts = Court.query.all()
@@ -785,13 +788,22 @@ def court_updates():
                         'active_groups': active_group_data,
                         'queue_groups': queue_group_data
                     }
+                
+                # Calculate a hash of the data to see if it has changed
+                court_json = json.dumps({'courts': court_data})
+                current_hash = hashlib.md5(court_json.encode()).hexdigest()
+                
+                # Only send an update if the data has changed
+                if current_hash != last_hash:
+                    last_hash = current_hash
+                    data = f"data: {court_json}\n\n"
+                    yield data
                     
-                data = f"data: {json.dumps({'courts': court_data})}\n\n"
-                yield data
             sleep(1)
     
     return Response(generate(), mimetype='text/event-stream')
 
+# Also update the poll endpoint for consistency
 @app.route('/court-updates-poll')
 def court_updates_poll():
     """Fallback endpoint for environments where SSE doesn't work"""
@@ -825,7 +837,13 @@ def court_updates_poll():
             'queue_groups': queue_group_data
         }
     
-    return jsonify({'courts': court_data})
+    # Add a timestamp to the data
+    response_data = {
+        'courts': court_data,
+        'timestamp': datetime.now().timestamp()
+    }
+    
+    return jsonify(response_data)
 
 
 if __name__ == '__main__':
