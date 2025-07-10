@@ -454,3 +454,285 @@ button:disabled {
     width: 100%;
     box-sizing: border-box;
 }
+
+/* Authentication Pages (Login/Signup) */
+.auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 20px;
+    min-height: 60vh;
+}
+
+.auth-card {
+    background: var(--background-primary);
+    border-radius: 16px;
+    padding: 32px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.auth-title {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 32px;
+    text-align: center;
+    color: var(--text-primary);
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.auth-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.auth-form-group label {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.auth-form-group input {
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    font-size: 17px;
+    background: var(--background-secondary);
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.auth-form-group input:focus {
+    outline: none;
+    border-color: var(--system-blue);
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+}
+
+.auth-form-group input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.auth-button {
+    margin-top: 8px;
+    padding: 16px 24px;
+    font-size: 17px;
+    font-weight: 600;
+    background-color: var(--system-blue);
+    color: white;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.auth-button:hover {
+    background-color: #0062CC;
+}
+
+.auth-button:active {
+    background-color: #0051A8;
+    transform: scale(0.98);
+}
+
+.auth-footer {
+    margin-top: 32px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+.auth-link {
+    color: var(--system-blue);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-link:hover {
+    text-decoration: underline;
+}
+
+.error-message {
+    color: var(--system-red);
+    font-size: 14px;
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+/* Admin Page */
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.admin-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.admin-section {
+    margin-bottom: 32px;
+}
+
+.section-title {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+
+.section-card {
+    background: var(--background-primary);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.timer-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 24px;
+}
+
+.timer-duration-control {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.timer-duration-control label {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.timer-input-group {
+    display: flex;
+    gap: 12px;
+}
+
+.timer-input {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    font-size: 17px;
+    background: var(--background-secondary);
+    color: var(--text-primary);
+}
+
+.timer-set-button {
+    padding: 12px 24px;
+}
+
+.timer-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.timer-control-button {
+    flex: 1;
+    padding: 14px 24px;
+}
+
+.start-button {
+    background-color: var(--system-green);
+}
+
+.stop-button {
+    background-color: var(--system-red);
+}
+
+.reset-button {
+    background-color: var(--system-blue);
+}
+
+.admin-actions {
+    margin-top: 24px;
+}
+
+.courts-admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 16px;
+}
+
+.court-admin-card {
+    background: var(--background-primary);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.court-admin-card h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+}
+
+.court-admin-info {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.court-admin-players, .court-admin-queue {
+    flex: 1;
+}
+
+.court-admin-info h4 {
+    font-size: 17px;
+    font-weight: 500;
+    margin: 0 0 8px 0;
+    color: var(--text-secondary);
+}
+
+.player-item, .queue-item {
+    padding: 10px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+}
+
+.queue-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: var(--system-blue);
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.empty-admin-message {
+    padding: 12px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-style: italic;
+    text-align: center;
+}

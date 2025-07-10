@@ -1,70 +1,98 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Admin Panel</h1>
-<a href="{{ url_for('home') }}">Back to Home</a>
+<div class="admin-header">
+    <h1>Admin Panel</h1>
+    <a href="{{ url_for('home') }}" class="nav-button">Back to Home</a>
+</div>
 
-<div class="timer-section">
-  <h2>Court Timer</h2>
-  <div class="timer-display" id="timer">15:00</div>
-  <div class="timer-controls">
-    <div class="form-group">
-      <label for="timerDuration">Set Time (minutes):</label>
-      <input type="number" id="timerDuration" min="0.5" max="60" value="15" step="0.1">
-      <button onclick="setDuration()">Set</button>
+<div class="admin-section">
+    <div class="section-card">
+        <h2>Court Timer</h2>
+        <div class="timer-display" id="timer">15:00</div>
+        
+        <div class="timer-controls">
+            <div class="timer-duration-control">
+                <label for="timerDuration">Set Time (minutes):</label>
+                <div class="timer-input-group">
+                    <input type="number" id="timerDuration" min="0.5" max="60" value="15" step="0.1" class="timer-input">
+                    <button onclick="setDuration()" class="timer-set-button">Set</button>
+                </div>
+            </div>
+            
+            <div class="timer-buttons">
+                <button onclick="startTimer()" class="timer-control-button start-button">Start</button>
+                <button onclick="stopTimer()" class="timer-control-button stop-button">Stop</button>
+                <button onclick="resetTimer()" class="timer-control-button reset-button">Reset</button>
+            </div>
+        </div>
     </div>
-    <button onclick="startTimer()">Start</button>
-    <button onclick="stopTimer()">Stop</button>
-    <button onclick="resetTimer()">Reset</button>
-  </div>
 </div>
 
-<div class="admin-controls">
-  <div class="club-status-control">
-    <h2>Club Status</h2>
-    <button id="clubStatusToggle"
-      class="status-button {{ 'active' if club_state.is_active else 'inactive' }}"
-      data-status="{{ 'deactivate' if club_state.is_active else 'activate' }}"
-      onclick="confirmToggleStatus()">
-      {% if club_state.is_active %}
-      Deactivate Club
-      {% else %}
-      Activate Club
-      {% endif %}
-    </button>
-    <div id="statusIndicator" class="status-text">
-      Club is currently {{ 'active' if club_state.is_active else 'inactive' }}.
+<div class="admin-section">
+    <div class="section-card">
+        <h2>Club Status</h2>
+        <button id="clubStatusToggle"
+            class="status-button {{ 'active' if club_state.is_active else 'inactive' }}"
+            data-status="{{ 'deactivate' if club_state.is_active else 'activate' }}"
+            onclick="confirmToggleStatus()">
+            {% if club_state.is_active %}
+            Deactivate Club
+            {% else %}
+            Activate Club
+            {% endif %}
+        </button>
+        <div id="statusIndicator" class="status-text">
+            Club is currently {{ 'active' if club_state.is_active else 'inactive' }}.
+        </div>
+        
+        <div class="admin-actions">
+            <button onclick="clearCourts()" class="danger-button">Clear All Courts</button>
+        </div>
     </div>
-  </div>
-
-  <button onclick="clearCourts()" class="danger-button">Clear All Courts</button>
 </div>
 
-<!-- Loop over actual Court objects -->
-{% for court in courts %}
-<div class="court-section">
-  <h2>{{ court.name }}</h2>
-
-  {% set player_usernames = court.players | map(attribute='username') | list %}
-  {% set queue_usernames = court.queue_entries | map(attribute='user.username') | list %}
-
-  <p><strong>Current Players:</strong>
-    {% if player_usernames %}
-      {{ player_usernames | join(', ') }}
-    {% else %}
-      None
-    {% endif %}
-  </p>
-
-  <p><strong>Queue:</strong>
-    {% if queue_usernames %}
-      {{ queue_usernames | join(', ') }}
-    {% else %}
-      None
-    {% endif %}
-  </p>
+<div class="admin-section">
+    <h2 class="section-title">Courts Overview</h2>
+    <div class="courts-admin-grid">
+        {% for court in courts %}
+        <div class="court-admin-card">
+            <h3>{{ court.name }}</h3>
+            
+            <div class="court-admin-info">
+                <div class="court-admin-players">
+                    <h4>Current Players</h4>
+                    <div class="player-list">
+                        {% if court.players %}
+                            {% for player in court.players %}
+                                <div class="player-item">{{ player.username }}</div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-admin-message">No players</div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="court-admin-queue">
+                    <h4>Queue</h4>
+                    <div class="queue-list">
+                        {% if court.queue %}
+                            {% for entry in court.queue | sort(attribute='position') %}
+                                <div class="queue-item">
+                                    <span class="queue-number">{{ entry.position }}</span>
+                                    {{ entry.user.username }}
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-admin-message">No queue</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
-{% endfor %}
 
 <script>
   let timerInterval;
