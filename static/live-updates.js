@@ -235,22 +235,6 @@ class CourtManager {
                     }
                     
                     queueContainer.innerHTML = queueHTML;
-                    
-                    // Add click event listeners to empty slots
-                    queueContainer.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
-                        slot.addEventListener('click', function() {
-                            const groupId = this.getAttribute('data-group-id');
-                            joinGroup(groupId);
-                        });
-                    });
-                    
-                    // Add click event listeners to create group buttons
-                    queueContainer.querySelectorAll('.create-group-button').forEach(button => {
-                        button.addEventListener('click', function() {
-                            const courtId = this.getAttribute('data-court-id');
-                            createNewGroup(courtId);
-                        });
-                    });
                 } else {
                     let queueHTML = `<div class="empty-message">No one in queue</div>`;
                     
@@ -267,14 +251,6 @@ class CourtManager {
                     }
                     
                     queueContainer.innerHTML = queueHTML;
-                    
-                    // Add click event listeners to create group buttons
-                    queueContainer.querySelectorAll('.create-group-button').forEach(button => {
-                        button.addEventListener('click', function() {
-                            const courtId = this.getAttribute('data-court-id');
-                            createNewGroup(courtId);
-                        });
-                    });
                 }
             }
         }
@@ -491,9 +467,14 @@ class CourtManager {
     }
 
     reattachEventListeners() {
+        // First, remove existing event listeners by cloning and replacing elements
+        
         // Handle empty slot clicks to join a group
         document.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
-            slot.addEventListener('click', function() {
+            const newSlot = slot.cloneNode(true);
+            slot.parentNode.replaceChild(newSlot, slot);
+            
+            newSlot.addEventListener('click', function() {
                 const groupId = this.getAttribute('data-group-id');
                 joinGroup(groupId);
             });
@@ -501,7 +482,10 @@ class CourtManager {
         
         // Handle create new group buttons
         document.querySelectorAll('.create-group-button').forEach(button => {
-            button.addEventListener('click', function() {
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
+            
+            newButton.addEventListener('click', function() {
                 const courtId = this.getAttribute('data-court-id');
                 createNewGroup(courtId);
             });
@@ -509,7 +493,16 @@ class CourtManager {
         
         // Handle tap on user's own slot for mobile
         document.querySelectorAll('.player-slot.my-slot').forEach(slot => {
-            slot.addEventListener('click', function(e) {
+            const newSlot = slot.cloneNode(true);
+            slot.parentNode.replaceChild(newSlot, slot);
+            
+            // Re-add the leave button click handler
+            const leaveButton = newSlot.querySelector('.leave-button');
+            if (leaveButton) {
+                leaveButton.onclick = () => leaveGroup();
+            }
+            
+            newSlot.addEventListener('click', function(e) {
                 // Don't toggle if clicking directly on the leave button
                 if (e.target.classList.contains('leave-button')) {
                     return;
@@ -520,8 +513,8 @@ class CourtManager {
                 
                 // Add a click handler to the document to close the button when clicking elsewhere
                 const closeLeaveButton = function(event) {
-                    if (!slot.contains(event.target)) {
-                        slot.classList.remove('show-leave-button');
+                    if (!newSlot.contains(event.target)) {
+                        newSlot.classList.remove('show-leave-button');
                         document.removeEventListener('click', closeLeaveButton);
                     }
                 };
@@ -537,10 +530,9 @@ class CourtManager {
     }
 }
 
-// Add this at the top level of the file outside any class
-let isCreatingGroup = false;
-let isJoiningGroup = false;
-let isLeavingGroup = false;
+// Add at the top of the file, outside any class
+let isProcessingRequest = false;
+let pendingActions = new Set();
 
 // Initialize on page load
 let courtManager;
@@ -593,81 +585,41 @@ function initLiveUpdates() {
     }
 }
 
-function joinGroup(groupId) {
-  // If already joining a group, ignore additional clicks
-  if (isJoiningGroup) {
-    console.log('Already joining a group, please wait...');
-    return;
-  }
-  
-  // Set the flag to prevent multiple requests
-  isJoiningGroup = true;
-  
-  // Disable the clicked slot to provide visual feedback
-  const clickedSlot = document.querySelector(`.player-slot.empty[data-group-id="${groupId}"]`);
-  if (clickedSlot) {
-    clickedSlot.style.opacity = '0.5';
-    clickedSlot.style.pointerEvents = 'none';
-  }
-  
-  fetch(`/join-slot/${groupId}`, {
-    method: 'POST',
-    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      showFlashMessage(data.message, 'success');
-      
-      // Force an immediate refresh of the display
-      sessionStorage.setItem('forceUpdate', 'true');
-      
-      // For a more reliable update, just reload the page
-      location.reload();
-    } else {
-      showFlashMessage(data.message, 'error');
-      
-      // Reset the clicked slot
-      if (clickedSlot) {
-        clickedSlot.style.opacity = '';
-        clickedSlot.style.pointerEvents = '';
-      }
-      
-      // Reset the flag
-      isJoiningGroup = false;
-    }
-  })
-  .catch(error => {
-    console.error('Error joining group:', error);
-    showFlashMessage('Error joining group', 'error');
-    
-    // Reset the clicked slot
-    if (clickedSlot) {
-      clickedSlot.style.opacity = '';
-      clickedSlot.style.pointerEvents = '';
-    }
-    
-    // Reset the flag
-    isJoiningGroup = false;
-  });
-}
-
 function createNewGroup(courtId) {
-  // If already creating a group, ignore additional clicks
-  if (isCreatingGroup) {
-    console.log('Already creating a group, please wait...');
+  console.log('Creating new group for court:', courtId);
+  
+  // Global check if any request is currently processing
+  if (isProcessingRequest) {
+    console.log('Request already in progress, please wait...');
     return;
   }
   
-  // Set the flag to prevent multiple requests
-  isCreatingGroup = true;
+  // Record this specific action to prevent duplicates
+  const actionId = `create_group_${courtId}`;
+  if (pendingActions.has(actionId)) {
+    console.log('This action is already pending');
+    return;
+  }
   
-  // Disable the button to provide visual feedback
+  // Set global processing flag immediately
+  isProcessingRequest = true;
+  pendingActions.add(actionId);
+  
+  // Disable ALL interactive elements to prevent any other actions
+  disableAllInteractions('Creating group...');
+  
+  // Visual feedback for the specific button
   const clickedButton = document.querySelector(`.create-group-button[data-court-id="${courtId}"]`);
   if (clickedButton) {
     clickedButton.disabled = true;
     clickedButton.textContent = 'Creating...';
+    clickedButton.classList.add('processing');
   }
+  
+  // Immediately disable all other create group buttons to prevent double clicks
+  document.querySelectorAll(`.create-group-button:not([data-court-id="${courtId}"])`).forEach(btn => {
+    btn.disabled = true;
+  });
   
   fetch(`/create-new-group/${courtId}`, {
     method: 'POST',
@@ -685,43 +637,79 @@ function createNewGroup(courtId) {
       location.reload();
     } else {
       showFlashMessage(data.message, 'error');
-      
-      // Reset the button
-      if (clickedButton) {
-        clickedButton.disabled = false;
-        clickedButton.textContent = 'Create New Group';
-      }
-      
-      // Reset the flag
-      isCreatingGroup = false;
+      resetInteractionState(actionId, clickedButton, 'Create New Group');
     }
   })
   .catch(error => {
     console.error('Error creating group:', error);
     showFlashMessage('Error creating group', 'error');
-    
-    // Reset the button
-    if (clickedButton) {
-      clickedButton.disabled = false;
-      clickedButton.textContent = 'Create New Group';
+    resetInteractionState(actionId, clickedButton, 'Create New Group');
+  });
+}
+
+function joinGroup(groupId) {
+  if (isProcessingRequest) {
+    console.log('Request already in progress, please wait...');
+    return;
+  }
+  
+  const actionId = `join_group_${groupId}`;
+  if (pendingActions.has(actionId)) {
+    console.log('This action is already pending');
+    return;
+  }
+  
+  isProcessingRequest = true;
+  pendingActions.add(actionId);
+  
+  disableAllInteractions('Joining group...');
+  
+  const clickedSlot = document.querySelector(`.player-slot.empty[data-group-id="${groupId}"]`);
+  if (clickedSlot) {
+    clickedSlot.style.opacity = '0.5';
+    clickedSlot.style.pointerEvents = 'none';
+  }
+  
+  fetch(`/join-slot/${groupId}`, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      showFlashMessage(data.message, 'success');
+      sessionStorage.setItem('forceUpdate', 'true');
+      location.reload();
+    } else {
+      showFlashMessage(data.message, 'error');
+      resetInteractionState(actionId, clickedSlot);
     }
-    
-    // Reset the flag
-    isCreatingGroup = false;
+  })
+  .catch(error => {
+    console.error('Error joining group:', error);
+    showFlashMessage('Error joining group', 'error');
+    resetInteractionState(actionId, clickedSlot);
   });
 }
 
 function leaveGroup() {
-  // If already leaving a group, ignore additional clicks
-  if (isLeavingGroup) {
-    console.log('Already leaving a group, please wait...');
+  if (isProcessingRequest) {
+    console.log('Request already in progress, please wait...');
     return;
   }
   
-  // Set the flag to prevent multiple requests
-  isLeavingGroup = true;
+  const actionId = 'leave_group';
+  if (pendingActions.has(actionId)) {
+    console.log('This action is already pending');
+    return;
+  }
   
-  // Find and disable all leave buttons to provide visual feedback
+  isProcessingRequest = true;
+  pendingActions.add(actionId);
+  
+  disableAllInteractions('Leaving group...');
+  
+  // Visual feedback for leave buttons
   document.querySelectorAll('.leave-button').forEach(button => {
     button.disabled = true;
     button.textContent = 'Leaving...';
@@ -735,39 +723,141 @@ function leaveGroup() {
   .then(data => {
     if (data.success) {
       showFlashMessage(data.message, 'warning');
-      
-      // Force an immediate refresh of the display
       sessionStorage.setItem('forceUpdate', 'true');
-      
-      // For a more reliable update, just reload the page
       location.reload();
     } else {
       showFlashMessage(data.message, 'error');
-      
-      // Reset all leave buttons
-      document.querySelectorAll('.leave-button').forEach(button => {
-        button.disabled = false;
-        button.textContent = 'Leave';
-      });
-      
-      // Reset the flag
-      isLeavingGroup = false;
+      resetInteractionState(actionId, null, null, '.leave-button');
     }
   })
   .catch(error => {
     console.error('Error leaving group:', error);
     showFlashMessage('Error leaving group', 'error');
-    
-    // Reset all leave buttons
-    document.querySelectorAll('.leave-button').forEach(button => {
-      button.disabled = false;
-      button.textContent = 'Leave';
-    });
-    
-    // Reset the flag
-    isLeavingGroup = false;
+    resetInteractionState(actionId, null, null, '.leave-button');
   });
 }
+
+// Add these helper functions
+function disableAllInteractions(message = 'Processing...') {
+  // Disable all buttons
+  document.querySelectorAll('button').forEach(button => {
+    if (!button.hasAttribute('data-original-text')) {
+      button.setAttribute('data-original-text', button.textContent);
+    }
+    button.disabled = true;
+  });
+  
+  // Disable all player slots
+  document.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
+    slot.style.opacity = '0.5';
+    slot.style.pointerEvents = 'none';
+  });
+  
+  // Optional: Add a global overlay to prevent all interactions
+  const overlay = document.createElement('div');
+  overlay.id = 'processing-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.1);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: all;
+  `;
+  
+  // Only add if it doesn't already exist
+  if (!document.getElementById('processing-overlay')) {
+    document.body.appendChild(overlay);
+  }
+}
+
+function resetInteractionState(actionId, specificElement = null, originalText = null, selectorForMultiple = null) {
+  // Remove the action from pending
+  pendingActions.delete(actionId);
+  
+  // Only fully reset if no other actions are pending
+  if (pendingActions.size === 0) {
+    isProcessingRequest = false;
+    
+    // Re-enable all buttons
+    document.querySelectorAll('button').forEach(button => {
+      button.disabled = false;
+      if (button.hasAttribute('data-original-text')) {
+        button.textContent = button.getAttribute('data-original-text');
+        button.removeAttribute('data-original-text');
+      }
+    });
+    
+    // Re-enable all player slots
+    document.querySelectorAll('.player-slot.empty[data-group-id]').forEach(slot => {
+      slot.style.opacity = '';
+      slot.style.pointerEvents = '';
+    });
+    
+    // Remove the overlay
+    const overlay = document.getElementById('processing-overlay');
+    if (overlay) {
+      overlay.remove();
+    }
+  }
+  
+  // Always handle the specific element that triggered the action
+  if (specificElement) {
+    specificElement.disabled = false;
+    specificElement.style.opacity = '';
+    specificElement.style.pointerEvents = '';
+    specificElement.classList.remove('processing');
+    if (originalText) {
+      specificElement.textContent = originalText;
+    }
+  }
+  
+  // If a selector for multiple elements is provided
+  if (selectorForMultiple) {
+    document.querySelectorAll(selectorForMultiple).forEach(el => {
+      el.disabled = false;
+      el.textContent = originalText || 'Leave';
+      el.style.opacity = '';
+      el.style.pointerEvents = '';
+    });
+  }
+}
+
+// Add CSS for the processing state
+document.addEventListener('DOMContentLoaded', function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    button.processing {
+      opacity: 0.7;
+      cursor: not-allowed;
+      position: relative;
+    }
+    
+    button.processing::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: calc(50% - 8px);
+      left: calc(50% - 8px);
+      border: 2px solid rgba(255,255,255,0.5);
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
+});
 
 // Add this helper function for immediate refresh
 async function refreshCourts() {
