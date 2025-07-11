@@ -97,11 +97,10 @@ body {
 }
 
 /* Update the timer title styles to match court management title */
-.timer-title {
+.timer-title, .court-management-title {
     font-size: 22px;
     font-weight: 600;
     margin: 0 0 24px 0;
-    text-align: left; /* Change from center to left */
 }
 
 /* Remove the timer header styling since we're not using it anymore */
@@ -909,7 +908,7 @@ button:disabled {
     background-color: var(--system-blue);
     color: white;
     padding: 8px 16px;
-    border-radius: 10px;
+    border-radius: 4px;
     font-size: 15px;
     font-weight: 500;
     text-decoration: none;
@@ -1171,6 +1170,7 @@ button:disabled {
 .queue-header {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   margin-bottom: 8px;
 }
 
@@ -1338,13 +1338,12 @@ button:disabled {
 .admin-modal {
     display: none;
     position: fixed;
-    z-index: 1000;
+    z-index: 9999;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5);
-    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
 }
 
 .admin-modal-content {
@@ -1354,7 +1353,6 @@ button:disabled {
     border-radius: 12px;
     width: 80%;
     max-width: 500px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .admin-modal-close {
@@ -1378,18 +1376,15 @@ button:disabled {
 .admin-modal label {
     display: block;
     margin-bottom: 5px;
-    font-size: 14px;
-    color: var(--text-secondary);
 }
 
 .admin-modal select {
     width: 100%;
-    padding: 10px;
-    border-radius: 6px;
+    padding: 8px;
+    border-radius: 4px;
     border: 1px solid var(--border-color);
     background-color: var(--background-secondary);
     color: var(--text-primary);
-    font-size: 16px;
 }
 
 .admin-modal button {
@@ -1425,6 +1420,10 @@ button:disabled {
     font-size: 12px;
     opacity: 0.8;
     transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
 .admin-leave-button:hover {
@@ -1488,4 +1487,51 @@ button:disabled {
     margin-right: 5px;
     font-weight: bold;
     color: var(--system-blue);
+}
+
+.admin-remove-queue-btn {
+    background-color: var(--system-red);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: all 0.2s ease;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 10;
+    line-height: 1;
+    padding: 0; /* Remove any inherited padding */
+    margin: 0; /* Remove any inherited margin */
+    min-width: 20px; /* Ensure minimum width */
+    min-height: 20px; /* Ensure minimum height */
+    max-width: 20px; /* Prevent it from getting larger */
+    max-height: 20px; /* Prevent it from getting larger */
+}
+
+.admin-remove-queue-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.queue-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-bottom: 8px;
+}
+
+.queue-group {
+    position: relative;
+    padding-top: 8px;
+    padding-right: 8px;
 }

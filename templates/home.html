@@ -110,7 +110,7 @@
 {% block scripts %}
 <script>
 window.currentUser = "{{ session.user if session.user else '' }}";
-window.MAX_PLAYERS = {{ MAX_PLAYERS }};  // Fix the variable substitution
+window.MAX_PLAYERS = 4;  // hard coding the number of max players (CAN CHANGE THIS IF NEEDED?)
 
 function updateTimerDisplay() {
   fetch('/timer/status')

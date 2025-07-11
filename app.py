@@ -452,19 +452,146 @@ def admin():
     if 'user' not in session:
         return redirect(url_for('login'))
     
-    username = session['user']
-    user = User.query.filter_by(username=username).first()
-    courts = Court.query.all()
-    users = User.query.all()
+    user = User.query.filter_by(username=session['user']).first()
     if not user or not user.is_admin:
-
-        # optional: don't even give this warning, just redirect to home immediately?
         flash('You do not have permission to access the admin page', 'error')
         return redirect(url_for('home'))
+    
     return render_template('admin.html', 
-                         courts=courts,
-                         users=users)  # Pass users to the template
+                         courts=Court.query.all(),
+                         users=User.query.all())
 
+@app.route('/admin/<action>', methods=['POST'])
+def admin_actions(action):
+    """Consolidated admin actions endpoint"""
+    if not _is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json() or {}
+    
+    if action == 'remove-player-from-group':
+        return _admin_remove_player(data.get('player_id'))
+    elif action == 'move-player':
+        return _admin_move_player(data.get('player_id'), data.get('group_id'))
+    elif action == 'create-group':
+        return _admin_create_group(data.get('court_id'), data.get('is_queue', False))
+    else:
+        return jsonify({'success': False, 'message': 'Invalid action'}), 400
+
+def _is_admin():
+    """Helper to check admin status"""
+    if 'user' not in session:
+        return False
+    user = User.query.filter_by(username=session['user']).first()
+    return user and user.is_admin
+
+def _admin_remove_player(player_id):
+    """Remove player from their group"""
+    if not player_id:
+        return jsonify({'success': False, 'message': 'Missing player_id'})
+    
+    player = User.query.get(player_id)
+    if not player:
+        return jsonify({'success': False, 'message': 'Player not found'})
+    
+    player.group = None
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Player removed successfully'})
+
+def _admin_move_player(player_id, group_id):
+    """Move player to a different group"""
+    if not player_id or not group_id:
+        return jsonify({'success': False, 'message': 'Missing required parameters'})
+    
+    player = User.query.get(player_id)
+    group = Group.query.get(group_id)
+    
+    if not player:
+        return jsonify({'success': False, 'message': 'Player not found'})
+    if not group:
+        return jsonify({'success': False, 'message': 'Group not found'})
+    if len(group.players) >= MAX_PLAYERS:
+        return jsonify({'success': False, 'message': 'Group is full'})
+    
+    # Clean up old empty group if needed
+    old_group = player.group
+    if old_group and len(old_group.players) == 1 and old_group.is_in_queue:
+        db.session.delete(old_group)
+    
+    player.group = group
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Player moved successfully'})
+@app.route('/admin/remove-queue-group', methods=['POST'])
+def admin_remove_queue_group():
+    """Admin function to remove a queue group"""
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_user = User.query.filter_by(username=session['user']).first()
+    if not current_user or not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    group_id = data.get('group_id')
+    
+    if not group_id:
+        return jsonify({'success': False, 'message': 'Missing group_id'})
+    
+    group = Group.query.get(group_id)
+    
+    if not group:
+        return jsonify({'success': False, 'message': 'Group not found'})
+    
+    if not group.is_in_queue:
+        return jsonify({'success': False, 'message': 'This is not a queue group'})
+    
+    court = group.court
+    removed_position = group.queue_position
+    
+    # Remove all players from the group first
+    for player in group.players:
+        player.group = None
+    
+    # Delete the group
+    db.session.delete(group)
+    
+    # Reorder remaining queue positions
+    remaining_queue_groups = Group.query.filter(
+        Group.court_id == court.id,
+        Group.is_in_queue == True,
+        Group.queue_position > removed_position
+    ).order_by(Group.queue_position).all()
+    
+    # Move all groups after the removed one up by one position
+    for queue_group in remaining_queue_groups:
+        queue_group.queue_position -= 1
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Queue group removed successfully'})
+def _admin_create_group(court_id, is_queue):
+    """Create a new group on a court"""
+    if not court_id:
+        return jsonify({'success': False, 'message': 'Missing court_id'})
+    
+    court = Court.query.get(court_id)
+    if not court:
+        return jsonify({'success': False, 'message': 'Court not found'})
+    
+    if is_queue:
+        next_position = get_next_queue_position(court)
+        new_group = Group(court=court, is_in_queue=True, queue_position=next_position)
+    else:
+        new_group = Group(court=court, is_in_queue=False, queue_position=None)
+    
+    db.session.add(new_group)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': f'Created new {"queue" if is_queue else "active"} group',
+        'group_id': new_group.id
+    })
 
 @app.route('/timer/start', methods=['POST'])
 def start_timer():
@@ -844,168 +971,6 @@ def court_updates_poll():
     }
     
     return jsonify(response_data)
-
-@app.route('/admin/remove-player-from-group', methods=['POST'])
-def admin_remove_player_from_group():
-    """Admin function to remove a player from their group"""
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    current_user = User.query.filter_by(username=session['user']).first()
-    if not current_user or not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    data = request.get_json()
-    player_id = data.get('player_id')
-    
-    if not player_id:
-        return jsonify({'success': False, 'message': 'Missing player_id'})
-    
-    player = User.query.get(player_id)
-    
-    if not player:
-        return jsonify({'success': False, 'message': 'Player not found'})
-    
-    # Remove player from group
-    player.group = None
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': 'Player removed successfully'})
-
-@app.route('/admin/add-player-to-group', methods=['POST'])
-def admin_add_player_to_group():
-    """Admin function to add a player to a group"""
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    current_user = User.query.filter_by(username=session['user']).first()
-    if not current_user or not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    data = request.get_json()
-    player_id = data.get('player_id')
-    group_id = data.get('group_id')
-    
-    if not player_id or not group_id:
-        return jsonify({'success': False, 'message': 'Missing required parameters'})
-    
-    player = User.query.get(player_id)
-    group = Group.query.get(group_id)
-    
-    if not player:
-        return jsonify({'success': False, 'message': 'Player not found'})
-    
-    if not group:
-        return jsonify({'success': False, 'message': 'Group not found'})
-    
-    # Check if player is already in a group
-    if player.group:
-        return jsonify({
-            'success': False, 
-            'message': 'Player is already in a group', 
-            'error_code': 'already_in_group'
-        })
-    
-    # Check if group is full
-    if len(group.players) >= MAX_PLAYERS:
-        return jsonify({'success': False, 'message': 'Group is full'})
-    
-    # Add player to group
-    player.group = group
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': 'Player added successfully'})
-
-@app.route('/admin/create-group', methods=['POST'])
-def admin_create_group():
-    """Admin function to create a new group on a court"""
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    current_user = User.query.filter_by(username=session['user']).first()
-    if not current_user or not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    data = request.get_json()
-    court_id = data.get('court_id')
-    is_queue = data.get('is_queue', False)
-    
-    if not court_id:
-        return jsonify({'success': False, 'message': 'Missing court_id'})
-    
-    court = Court.query.get(court_id)
-    
-    if not court:
-        return jsonify({'success': False, 'message': 'Court not found'})
-    
-    # Create new group
-    if is_queue:
-        # For queue groups, we need to assign a queue position
-        next_position = get_next_queue_position(court)
-        new_group = Group(
-            court=court,
-            is_in_queue=True,
-            queue_position=next_position
-        )
-    else:
-        # For active groups
-        new_group = Group(
-            court=court,
-            is_in_queue=False,
-            queue_position=None
-        )
-    
-    db.session.add(new_group)
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': f'Created new {"queue" if is_queue else "active"} group',
-        'group_id': new_group.id
-    })
-
-@app.route('/admin/move-player', methods=['POST'])
-def admin_move_player():
-    """Admin function to move a player between groups"""
-    if 'user' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    current_user = User.query.filter_by(username=session['user']).first()
-    if not current_user or not current_user.is_admin:
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    data = request.get_json()
-    player_id = data.get('player_id')
-    group_id = data.get('group_id')
-    
-    if not player_id or not group_id:
-        return jsonify({'success': False, 'message': 'Missing required parameters'})
-    
-    player = User.query.get(player_id)
-    group = Group.query.get(group_id)
-    
-    if not player:
-        return jsonify({'success': False, 'message': 'Player not found'})
-    
-    if not group:
-        return jsonify({'success': False, 'message': 'Group not found'})
-    
-    # Check if group is full
-    if len(group.players) >= MAX_PLAYERS:
-        return jsonify({'success': False, 'message': 'Group is full'})
-    
-    # Check if player's old group will be empty after they leave
-    old_group = player.group
-    if old_group and len(old_group.players) == 1:
-        # If it's a queue group, it might be better to remove it
-        if old_group.is_in_queue:
-            db.session.delete(old_group)
-    
-    # Move player to new group
-    player.group = group
-    db.session.commit()
-    
-    return jsonify({'success': True, 'message': 'Player moved successfully'})
 
 if __name__ == '__main__':
     with app.app_context():

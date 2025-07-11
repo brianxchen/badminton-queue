@@ -98,6 +98,7 @@
                                 <div class="queue-group">
                                     <div class="queue-header">
                                         <span class="queue-number">{{ group.queue_position }}</span>
+                                        <button class="admin-remove-queue-btn" onclick="adminRemoveQueueGroup('{{ group.id }}', '{{ group.players|length }}')">×</button>
                                     </div>
                                     
                                     <div class="queue-slots">
@@ -164,397 +165,259 @@
 </div>
 
 <script>
-  let timerInterval;
+let timerInterval;
 
-  function formatTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+// Core functions
+const formatTime = (seconds) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const apiCall = async (url, data = null) => {
+  const options = { method: data ? 'POST' : 'GET' };
+  if (data) {
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = JSON.stringify(data);
+  }
+  return await fetch(url, options);
+};
+
+// Timer functions
+const updateTimerDisplay = async () => {
+  try {
+    const response = await apiCall('/timer/status');
+    const data = await response.json();
+    document.getElementById('timer').textContent = formatTime(data.remaining);
+  } catch (error) {
+    console.error('Timer error:', error);
+  }
+};
+
+const setDuration = async () => {
+  const minutes = parseFloat(document.getElementById('timerDuration').value);
+  try {
+    const response = await apiCall('/timer/set-duration', { minutes });
+    if (response.ok) {
+      const data = await response.json();
+      document.getElementById('timer').textContent = formatTime(data.duration);
+    }
+  } catch (error) {
+    console.error('Duration error:', error);
+  }
+};
+
+const startTimer = async () => {
+  try {
+    const response = await apiCall('/timer/start', {});
+    if (response.ok && !timerInterval) {
+      timerInterval = setInterval(updateTimerDisplay, 1000);
+      updateTimerDisplay();
+    }
+  } catch (error) {
+    console.error('Start timer error:', error);
+  }
+};
+
+const pauseTimer = async () => {
+  try {
+    await apiCall('/timer/stop', {});
+    updateTimerDisplay();
+  } catch (error) {
+    console.error('Pause timer error:', error);
+  }
+};
+
+const resetTimer = async () => {
+  try {
+    await apiCall('/timer/reset', {});
+    updateTimerDisplay();
+  } catch (error) {
+    console.error('Reset timer error:', error);
+  }
+};
+
+// Club status functions
+const updateClubStatus = async () => {
+  try {
+    const response = await apiCall('/club-status');
+    const data = await response.json();
+    const btn = document.getElementById('clubStatusToggle');
+    if (btn) {
+      btn.className = `club-status-button ${data.is_active ? 'active' : 'inactive'}`;
+      btn.textContent = `${data.is_active ? 'Deactivate' : 'Activate'} Club`;
+    }
+  } catch (error) {
+    console.error('Club status error:', error);
+  }
+};
+
+const confirmToggleStatus = () => {
+  const btn = document.getElementById('clubStatusToggle');
+  const isActive = btn.classList.contains('active');
+  const message = isActive ? 
+    'Deactivate club and kick everyone out?' : 
+    'Activate the club?';
+  
+  if (confirm(message)) toggleClubStatus();
+};
+
+const toggleClubStatus = async () => {
+  try {
+    const response = await apiCall('/toggle-club-status', {});
+    if (response.ok) {
+      updateClubStatus();
+      location.reload();
+    }
+  } catch (error) {
+    console.error('Toggle status error:', error);
+  }
+};
+
+const clearCourts = async () => {
+  if (!confirm('Clear all courts and remove all players?')) return;
+  
+  try {
+    const response = await apiCall('/clear-courts', {});
+    if (response.ok) location.reload();
+  } catch (error) {
+    console.error('Clear courts error:', error);
+  }
+};
+
+// Admin player management
+const adminRemovePlayer = async (playerId) => {
+  if (!confirm('Remove this player?')) return;
+  
+  try {
+    const response = await apiCall('/admin/remove-player-from-group', { player_id: playerId });
+    const data = await response.json();
+    if (data.success) {
+      location.reload();
     } else {
-      return `${minutes}:${secs.toString().padStart(2, '0')}`;
+      alert('Error: ' + data.message);
     }
+  } catch (error) {
+    console.error('Remove player error:', error);
   }
+};
 
-  async function updateTimerDisplay() {
-    try {
-      const response = await fetch('/timer/status');
-      const data = await response.json();
-      document.getElementById('timer').textContent = formatTime(data.remaining);
-    } catch (error) {
-      console.error('Error updating timer:', error);
-    }
-  }
-
-  async function updateClubStatus() {
-    try {
-      const response = await fetch('/club-status');
-      const data = await response.json();
-      const toggleButton = document.getElementById('clubStatusToggle');
-      
-      if (toggleButton) {
-        // Update button class and text
-        toggleButton.className = data.is_active ? 'club-status-button active' : 'club-status-button inactive';
-        toggleButton.textContent = data.is_active ? 'Deactivate Club' : 'Activate Club';
-        toggleButton.setAttribute('data-status', data.is_active ? 'deactivate' : 'activate');
-      }
-    } catch (error) {
-      console.error('Error updating club status:', error);
-    }
-  }
-
-  async function setDuration() {
-    const minutes = parseFloat(document.getElementById('timerDuration').value);
-    try {
-      const response = await fetch('/timer/set-duration', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ minutes: minutes })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        document.getElementById('timer').textContent = formatTime(data.duration);
-      } else {
-        alert('Failed to set duration');
-      }
-    } catch (error) {
-      console.error('Error setting duration:', error);
-      alert('Failed to set duration');
-    }
-  }
-
-  async function startTimer() {
-    try {
-      const response = await fetch('/timer/start', { method: 'POST' });
-      if (response.ok) {
-        if (!timerInterval) {
-          timerInterval = setInterval(updateTimerDisplay, 1000);
-        }
-        updateTimerDisplay();
-      }
-    } catch (error) {
-      console.error('Error starting timer:', error);
-    }
-  }
-
-  async function pauseTimer() {
-    try {
-      const response = await fetch('/timer/stop', { 
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      if (response.ok) {
-        updateTimerDisplay();
-      }
-    } catch (error) {
-      console.error('Error pausing timer:', error);
-    }
-  }
-
-  async function resetTimer() {
-    try {
-      const response = await fetch('/timer/reset', { method: 'POST' });
-      if (response.ok) {
-        updateTimerDisplay();
-      }
-    } catch (error) {
-      console.error('Error resetting timer:', error);
-    }
-  }
-
-  function confirmToggleStatus() {
-    // Get the button element directly since that's what we have
-    const toggleButton = document.getElementById('clubStatusToggle');
-    const isActive = toggleButton.classList.contains('active');
-    
-    const message = isActive ? 
-      'Are you sure you want to deactivate the club? This will kick everyone out.' : 
-      'Are you sure you want to activate the club?';
-    
-    if (confirm(message)) {
-      toggleClubStatus();
-    }
-  }
-
-  async function toggleClubStatus() {
-    try {
-      const response = await fetch('/toggle-club-status', { method: 'POST' });
-      if (response.ok) {
-        updateClubStatus();
-        if (response.status === 200) {
-          location.reload();
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling club status:', error);
-    }
-  }
-
-  async function clearCourts() {
-    if (!confirm('Are you sure you want to clear all courts? This will remove all players from all groups.')) {
+const adminRemoveQueueGroup = async (groupId, playerCount) => {
+  // If there are players in the group, show confirmation
+  if (playerCount > 0) {
+    const confirmMessage = `This queue group has ${playerCount} player${playerCount > 1 ? 's' : ''}. Removing it will kick them out. Are you sure?`;
+    if (!confirm(confirmMessage)) {
       return;
     }
-    try {
-      const response = await fetch('/clear-courts', { method: 'POST' });
-      if (response.ok) {
-        location.reload();
-      } else {
-        alert('Failed to clear courts');
-      }
-    } catch (error) {
-      console.error('Error clearing courts:', error);
-      alert('Failed to clear courts');
-    }
   }
-
-  // ADMIN PLAYER MANAGEMENT FUNCTIONS
-  async function adminRemovePlayer(playerId) {
-    if (!confirm('Are you sure you want to remove this player?')) {
-        return;
-    }
-    
-    try {
-        const response = await fetch('/admin/remove-player-from-group', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ player_id: playerId })
-        });
-        
-        const data = await response.json();
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + data.message);
-        }
-    } catch (error) {
-        console.error('Error removing player:', error);
-        alert('Failed to remove player');
-    }
-  }
-
-  function showAddPlayerModal(groupId) {
-    console.log("Opening modal for group ID:", groupId);
-    document.getElementById('targetGroupId').value = groupId;
-    document.getElementById('adminAddPlayerModal').style.display = 'block';
-  }
-
-  function closeAddPlayerModal() {
-    document.getElementById('adminAddPlayerModal').style.display = 'none';
-  }
-
-  function adminAddPlayerToGroup() {
-    const groupId = document.getElementById('targetGroupId').value;
-    const playerId = document.getElementById('playerSelect').value;
-    
-    if (!playerId) {
-        alert('Please select a player');
-        return;
-    }
-    
-    console.log("Adding player", playerId, "to group", groupId);
-    
-    // Use move-player endpoint which handles both new adds and moves
-    fetch('/admin/move-player', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            player_id: playerId,
-            group_id: groupId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            closeAddPlayerModal();
-            location.reload();
-        } else {
-            alert('Error: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error adding/moving player:', error);
-        alert('Failed to add/move player');
+  
+  try {
+    const response = await apiCall('/admin/remove-queue-group', {
+      group_id: groupId
     });
+    const data = await response.json();
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('Error: ' + data.message);
+    }
+  } catch (error) {
+    console.error('Remove queue group error:', error);
+    alert('Failed to remove queue group');
   }
+};
 
-  async function adminCreateGroup(courtId, isQueue) {
-    try {
-        const response = await fetch('/admin/create-group', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                court_id: courtId,
-                is_queue: isQueue
-            })
-        });
-        
-        const data = await response.json();
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + data.message);
-        }
-    } catch (error) {
-        console.error('Error creating group:', error);
-        alert('Failed to create group');
-    }
+const showAddPlayerModal = (groupId) => {
+  document.getElementById('targetGroupId').value = groupId;
+  document.getElementById('adminAddPlayerModal').style.display = 'block';
+};
+
+const closeAddPlayerModal = () => {
+  document.getElementById('adminAddPlayerModal').style.display = 'none';
+};
+
+const adminAddPlayerToGroup = async () => {
+  const groupId = document.getElementById('targetGroupId').value;
+  const playerId = document.getElementById('playerSelect').value;
+  
+  if (!playerId) {
+    alert('Please select a player');
+    return;
   }
-
-  // INITIALIZATION
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log("Admin panel initialized");
-    
-    // Debug: Check for admin empty slots
-    const emptySlots = document.querySelectorAll('.admin-empty-slot');
-    console.log(`Found ${emptySlots.length} admin empty slots`);
-    
-    // Set up click handlers for admin empty slots
-    emptySlots.forEach((slot, index) => {
-      const groupId = slot.getAttribute('data-group-id');
-      console.log(`Setting up slot ${index}: Group ID = ${groupId}`);
-      
-      // Make it visually clear these are clickable
-      slot.style.cursor = 'pointer';
-      slot.style.backgroundColor = 'rgba(0, 122, 255, 0.05)';
-      slot.innerHTML = `<span class="slot-placeholder">+ Add Player</span>`;
-      
-      // Add click event
-      slot.onclick = function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const groupId = this.getAttribute('data-group-id');
-        console.log(`Admin slot clicked, group ID: ${groupId}`);
-        showAddPlayerModal(groupId);
-        return false;
-      };
+  
+  try {
+    const response = await apiCall('/admin/move-player', {
+      player_id: playerId,
+      group_id: groupId
     });
+    const data = await response.json();
+    if (data.success) {
+      closeAddPlayerModal();
+      location.reload();
+    } else {
+      alert('Error: ' + data.message);
+    }
+  } catch (error) {
+    console.error('Add player error:', error);
+  }
+};
 
-    console.log("Empty slots found:", document.querySelectorAll('.admin-empty-slot').length);
-    document.querySelectorAll('.admin-empty-slot').forEach((slot, i) => {
-        console.log(`Slot ${i}:`, slot.getAttribute('data-group-id'));
+const adminCreateGroup = async (courtId, isQueue) => {
+  try {
+    const response = await apiCall('/admin/create-group', {
+      court_id: courtId,
+      is_queue: isQueue
     });
-    
-    // Set up create group buttons
-    document.querySelectorAll('.admin-create-button').forEach(button => {
-      button.addEventListener('click', function() {
-        const courtId = this.getAttribute('data-court-id');
-        const isQueue = true; // Always queue for admin panel
-        adminCreateGroup(courtId, isQueue);
-      });
-    });
-    
-    // Modal click outside to close
-    window.onclick = function(event) {
-      const modal = document.getElementById('adminAddPlayerModal');
-      if (event.target == modal) {
-        closeAddPlayerModal();
-      }
-    };
-    
-    // Initialize timers and status
-    updateTimerDisplay();
-    setInterval(updateTimerDisplay, 1000);
-    updateClubStatus();
-    setInterval(updateClubStatus, 30000);
-  });
+    const data = await response.json();
+    if (data.success) {
+      location.reload();
+    } else {
+      alert('Error: ' + data.message);
+    }
+  } catch (error) {
+    console.error('Create group error:', error);
+  }
+};
 
-  // Add CSS for better visual feedback
-  const style = document.createElement('style');
-  style.innerHTML = `
-    .admin-empty-slot:hover {
-      background-color: rgba(0, 122, 255, 0.1) !important;
-      transform: translateY(-2px);
-      transition: all 0.2s ease;
-    }
-    
-    .admin-modal {
-      display: none;
-      position: fixed;
-      z-index: 9999;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0,0,0,0.4);
-    }
-    
-    .admin-modal-content {
-      background-color: var(--background-primary);
-      margin: 15% auto;
-      padding: 20px;
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      width: 80%;
-      max-width: 500px;
-    }
-    
-    .admin-modal-close {
-      color: var(--text-secondary);
-      float: right;
-      font-size: 28px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    
-    .form-group {
-      margin-bottom: 15px;
-    }
-    
-    .form-group label {
-      display: block;
-      margin-bottom: 5px;
-    }
-    
-    .form-group select {
-      width: 100%;
-      padding: 8px;
-      border-radius: 4px;
-      border: 1px solid var(--border-color);
-      background-color: var(--background-secondary);
-      color: var(--text-primary);
-    }
-    
-    .admin-button {
-      padding: 8px 16px;
-      background-color: var(--system-blue);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-  `;
-  document.head.appendChild(style);
-</script>
-
-<script>
-// Simple admin slot click handler - add this right before </body>
+// Initialization
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Setting up admin handlers");
-    
-    // Override clicks on admin empty slots
-    document.addEventListener('click', function(e) {
-        // Check if the clicked element is an admin empty slot
-        if (e.target.closest('.admin-empty-slot')) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            
-            const slot = e.target.closest('.admin-empty-slot');
-            const groupId = slot.getAttribute('data-group-id');
-            
-            console.log("Admin slot clicked, group ID:", groupId);
-            
-            if (groupId) {
-                showAddPlayerModal(groupId);
-            }
-            
-            return false;
-        }
-    }, true); // Use capture phase to intercept before other handlers
+  // Set up admin empty slot clicks
+  document.addEventListener('click', function(e) {
+    const slot = e.target.closest('.admin-empty-slot');
+    if (slot) {
+      e.preventDefault();
+      e.stopPropagation();
+      const groupId = slot.getAttribute('data-group-id');
+      if (groupId) showAddPlayerModal(groupId);
+      return false;
+    }
+  }, true);
+  
+  // Set up create group buttons
+  document.querySelectorAll('.admin-create-button').forEach(button => {
+    button.onclick = () => {
+      const courtId = button.getAttribute('data-court-id');
+      adminCreateGroup(courtId, true);
+    };
+  });
+  
+  // Modal close on outside click
+  window.onclick = (e) => {
+    if (e.target.id === 'adminAddPlayerModal') closeAddPlayerModal();
+  };
+  
+  // Style admin empty slots
+  document.querySelectorAll('.admin-empty-slot').forEach(slot => {
+    slot.style.cursor = 'pointer';
+    slot.style.backgroundColor = 'rgba(0, 122, 255, 0.05)';
+    slot.innerHTML = '<span class="slot-placeholder">Add Player</span>';
+  });
+  
+  // Initialize timers and status
+  updateTimerDisplay();
+  setInterval(updateTimerDisplay, 1000);
+  updateClubStatus();
+  setInterval(updateClubStatus, 30000);
 });
 </script>
 {% endblock %}
