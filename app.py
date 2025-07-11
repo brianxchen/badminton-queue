@@ -26,51 +26,28 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# User model for database
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)
-    is_checked_in = db.Column(db.Boolean, default=False)
-
-    # Foreign key for court association (this is the primary key assigning each user to a court)
-    court_id = db.Column(db.Integer, db.ForeignKey('court.id'), nullable=True)
-
-    # Queue entry
-    queue_entry = db.relationship('QueueEntry', back_populates='user', uselist=False)
-
-
 class Court(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), unique=True, nullable=False)
     
-    # players = users that have court_id == this court's id
-    players = db.relationship('User', backref='court', lazy=True)
+    # Now we have groups both on court and in queue
+    # The groups relationship is defined in the Group model
     
-    # queue = users waiting to play on this court
-    queue = db.relationship('QueueEntry', backref='court', lazy=True, order_by='QueueEntry.position')
-
-    # e.g. to get the players on court 1, do
-    # court = Court.query.filter_by(id=1).first()
-    # court.players
-
-    # Likewise, to get the court that a user is on, do
-    # user = User.query.filter_by(username='some_username').first()
-    # user.court
-
-    # Assigning to a court can be done with
-    # court = Court.query.filter_by(id=1).first()
-    # user = User.query.filter_by(username='some_username').first()
-    # user.court = court
-    # db.session.commit()
-
     def to_dict(self):
+        # Get active groups on court
+        active_groups = [group for group in self.groups if not group.is_in_queue]
+        
+        # Get groups in queue, sorted by position
+        queue_groups = sorted(
+            [group for group in self.groups if group.is_in_queue],
+            key=lambda g: g.queue_position
+        )
+        
         return {
             'id': self.id,
             'name': self.name,
-            'players': [player.username for player in self.players],
-            'queue': [entry.user.username for entry in self.queue]
+            'active_groups': [group.to_dict() for group in active_groups],
+            'queue_groups': [group.to_dict() for group in queue_groups]
         }
 
 class QueueEntry(db.Model):
@@ -96,10 +73,73 @@ class TimerState(db.Model):
     start_time = db.Column(db.Float, nullable=True)
     end_time = db.Column(db.Float, nullable=True)
 
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    is_checked_in = db.Column(db.Boolean, default=False)
+    
+    # Add the group_id foreign key to connect User to Group
+    group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=True)
+    
+    # Keep the old court_id for compatibility during transition
+    court_id = db.Column(db.Integer, db.ForeignKey('court.id'), nullable=True)
+
+    # Queue entry
+    queue_entry = db.relationship('QueueEntry', back_populates='user', uselist=False)
+
+class Group(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    court_id = db.Column(db.Integer, db.ForeignKey('court.id'), nullable=True)
+    is_in_queue = db.Column(db.Boolean, default=True)  # True if in queue, False if on court
+    queue_position = db.Column(db.Integer, nullable=True)  # Position in queue (NULL if on court)
+    
+    # Relationships
+    court = db.relationship('Court', backref='groups')
+    # Define the relationship from Group to User (players)
+    # The backref here creates the 'group' attribute on User objects
+    players = db.relationship('User', backref='group', lazy=True, foreign_keys=[User.group_id])
+    
+    def is_full(self):
+        return len(self.players) >= MAX_PLAYERS
+        
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'is_in_queue': self.is_in_queue,
+            'queue_position': self.queue_position,
+            'players': [player.username for player in self.players],
+            'is_full': self.is_full()
+        }
+def get_user_group(user):
+    """Get the group a user belongs to"""
+    if isinstance(user, str):
+        user = User.query.filter_by(username=user).first()
+    if not user:
+        return None
+    return user.group
+
+def is_user_active(user):
+    """Check if user is in any group"""
+    if isinstance(user, str):
+        user = User.query.filter_by(username=user).first()
+    if not user:
+        return False
+    return user.group is not None
+
+def get_next_queue_position(court):
+    """Get the next position for a new group in the queue"""
+    max_position = db.session.query(db.func.max(Group.queue_position)).filter(
+        Group.court_id == court.id, 
+        Group.is_in_queue == True
+    ).scalar()
+    
+    return 1 if max_position is None else max_position + 1
 # Old court model
 # courts = {f'Court {i}': {'players': [], 'queue': []} for i in range(1, 5)}  # 4 courts
 
-MAX_PLAYERS = 2
+MAX_PLAYERS = 4
 
 def is_user_active_elsewhere(user):
     """Check if user is active on any court or in any queue"""
@@ -163,7 +203,8 @@ def inject_utilities():
             
     return {
         'MAX_PLAYERS': MAX_PLAYERS,
-        'is_user_active_elsewhere': is_user_active_elsewhere,
+        'is_user_active': is_user_active,  # Use the new helper function
+        'is_user_active_elsewhere': is_user_active_elsewhere,  # Keep for backward compatibility
         'club_state': club_state,
         'is_player_on_court': is_player_on_court,
         'timer_state': timer_state,
@@ -171,7 +212,6 @@ def inject_utilities():
         'signature': get_random_signature(),
         'is_admin': is_admin 
     }
-
 
 @app.route('/')
 def home():
@@ -247,192 +287,311 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# Update the join_court route to handle AJAX
-@app.route('/join_court/<court_name>', methods=['POST'])
-def join_court(court_name):
-    username = session.get('user')
-    if not username:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': 'You must be logged in to join a court'}), 401
-        flash('You must be logged in to join a court', 'error')
-        return redirect(url_for('login'))
-
-    user = User.query.filter_by(username=username).first()
-    court = Court.query.filter_by(name=court_name).first()
-
-    if court and len(court.players) < MAX_PLAYERS:
-        if not is_user_active_elsewhere(user):
-            if not user.court:
-                user.court = court
-                db.session.commit()
-                
-                message = f'You joined {court.name}'
-                flash(message, 'success')
-                
-                # Return JSON response for AJAX requests
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({
-                        'success': True,
-                        'court_id': court.id,
-                        'court_name': court.name,
-                        'action': 'join_court',
-                        'username': username,
-                        'message': message
-                    })
-            else:
-                message = 'You are already on a court.'
-                flash(message, 'error')
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': message})
-        else:
-            message = 'You are already active elsewhere.'
-            flash(message, 'error')
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': message})
-    else:
-        message = 'Court is full or does not exist.'
-        flash(message, 'error')
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': message})
-
-    return redirect(url_for('home'))
-
-@app.route('/join_queue/<court_name>', methods=['POST'])
-def join_queue(court_name):
-    username = session.get('user')
-    if not username:
-        flash('You must be logged in to join a queue', 'error')
-        return redirect(url_for('login'))
-
-    user = User.query.filter_by(username=username).first()
-    court = Court.query.filter_by(name=court_name).first()
-
-    # Check if user is already in any queue
-    if court and not user.queue_entry:
-        if not is_user_active_elsewhere(user):
-            if not user.court:
-                # Calculate position - it should be the length of the current queue + 1
-                next_position = 1  # Default to 1 if no entries
-                
-                # Get the last entry's position if there are entries
-                last_entry = QueueEntry.query.filter_by(court_id=court.id).order_by(QueueEntry.position.desc()).first()
-                if last_entry:
-                    next_position = last_entry.position + 1
-                
-                # Add to queue with correct position
-                queue_entry = QueueEntry(user=user, court=court, position=next_position)
-                db.session.add(queue_entry)
-                db.session.commit()
-                flash(f'You joined the queue for {court.name}', 'success')
-                
-                # If this is an AJAX request, return updated data
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({
-                        'success': True,
-                        'court_id': court.id,
-                        'court_name': court.name,
-                        'action': 'join_queue',
-                        'username': username,
-                        'message': f'You joined the queue for {court.name}'
-                    })
-            else:
-                flash('You are already on a court.', 'error')
-        else:
-            flash('You are already active elsewhere.', 'error')
-    else:
-        flash('Court is full or does not exist.', 'error')
-
-    return redirect(url_for('home'))
-
-# Update the leave_court route to handle AJAX
-@app.route('/leave_court/<court_name>', methods=['POST'])
-def leave_court(court_name):
+@app.route('/join-slot/<int:group_id>', methods=['POST'])
+def join_slot(group_id):
     if 'user' not in session:
+        flash('You must be logged in', 'error')
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'message': 'You must be logged in'}), 401
         return redirect(url_for('login'))
     
     username = session['user']
     user = User.query.filter_by(username=username).first()
-    court = Court.query.filter_by(name=court_name).first()
-    timer_state = TimerState.query.first()
+    group = Group.query.get(group_id)
     
-    if not user or not court:
+    if not group:
+        flash('Group not found', 'error')
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': 'User or court not found'})
+            return jsonify({'success': False, 'message': 'Group not found'})
         return redirect(url_for('home'))
-
-    did_something = False
-    message = ""
-
-    # Leave *any* queue entry
-    if user.queue_entry:
-        db.session.delete(user.queue_entry)
-        did_something = True
-
-        # Reorder the queue for that court if it was this court's queue
-        if user.queue_entry.court_id == court.id:
-            for i, entry in enumerate(court.queue, 1):
-                entry.position = i
-        message = f'You left the queue for {court.name}'
-        flash(message, 'warning')
-
-    # Leave court if they're on this court and timer is not running
-    if user.court == court:
-        if not timer_state.is_running:
-            user.court = None
-            did_something = True
-
-            # Promote next players from queue
-            while len(court.players) < MAX_PLAYERS and court.queue:
-                next_entry = court.queue[0]
-                next_entry.user.court = court
-                db.session.delete(next_entry)
-                for i, entry in enumerate(court.queue[1:], 1):
-                    entry.position = i
-            message = f'You left the court for {court.name}'
-            flash(message, 'warning')
-        else:
-            message = 'Cannot leave court while timer is running'
-            flash(message, 'error')
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': message})
-
-    if did_something:
-        db.session.commit()
+    
+    if user.group:
+        flash('You are already in a group', 'error')
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({
-                'success': True,
-                'court_id': court.id,
-                'court_name': court.name,
-                'action': 'leave_court',
-                'username': username,
-                'message': message
-            })
-
+            return jsonify({'success': False, 'message': 'You are already in a group'})
+        return redirect(url_for('home'))
+    
+    if len(group.players) >= MAX_PLAYERS:
+        flash('Group is full', 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Group is full'})
+        return redirect(url_for('home'))
+    
+    # Add user to group
+    user.group = group
+    db.session.commit()
+    
+    court_name = group.court.name
+    message = f'You joined a {"court" if not group.is_in_queue else "queue"} group for {court_name}'
+    flash(message, 'success')
+    
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({'success': False, 'message': 'No action taken'})
+        return jsonify({
+            'success': True,
+            'court_id': group.court.id,
+            'group_id': group.id,
+            'message': message
+        })
+    
     return redirect(url_for('home'))
 
+@app.route('/create-new-group/<int:court_id>', methods=['POST'])
+def create_new_group(court_id):
+    if 'user' not in session:
+        flash('You must be logged in', 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'You must be logged in'}), 401
+        return redirect(url_for('login'))
+    
+    username = session['user']
+    user = User.query.filter_by(username=username).first()
+    court = Court.query.get(court_id)
+    
+    if not court:
+        flash('Court not found', 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Court not found'})
+        return redirect(url_for('home'))
+    
+    if user.group:
+        flash('You are already in a group', 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'You are already in a group'})
+        return redirect(url_for('home'))
+    
+    # Create new group in queue
+    next_position = get_next_queue_position(court)
+    new_group = Group(
+        court=court,
+        is_in_queue=True,
+        queue_position=next_position
+    )
+    
+    db.session.add(new_group)
+    db.session.flush()  # Flush to get the new group ID
+    
+    # Add user to the new group
+    user.group = new_group
+    db.session.commit()
+    
+    message = f'You created a new group in the queue for {court.name}'
+    flash(message, 'success')
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'court_id': court.id,
+            'group_id': new_group.id,
+            'message': message
+        })
+    
+    return redirect(url_for('home'))
+@app.route('/leave-group', methods=['POST'])
+def leave_group():
+    if 'user' not in session:
+        flash('You must be logged in', 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'You must be logged in'}), 401
+        return redirect(url_for('login'))
+    
+    username = session['user']
+    user = User.query.filter_by(username=username).first()
+    
+    if not user.group:
+        flash('You are not in any group', 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'You are not in any group'})
+        return redirect(url_for('home'))
+    
+    group = user.group
+    court = group.court
+    court_name = court.name
+    
+    # Check if group is on court and timer is running
+    timer_state = TimerState.query.first()
+    if not group.is_in_queue and timer_state.is_running:
+        flash('Cannot leave court while timer is running', 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Cannot leave court while timer is running'})
+        return redirect(url_for('home'))
+    
+    # Remove user from group
+    user.group = None
+    
+    # MODIFIED: We don't delete empty groups anymore, we keep them with empty slots
+    # We only want to reorder queue positions if it's an empty queue group at the END of the queue
+    if group.is_in_queue:
+        # Count players in the group
+        remaining_players = [p for p in group.players if p.id != user.id]
+        
+        # If this is an empty group AND it's the last group in the queue, delete it
+        last_position = db.session.query(db.func.max(Group.queue_position)).filter(
+            Group.court_id == court.id,
+            Group.is_in_queue == True
+        ).scalar() or 0
+        
+        if not remaining_players and group.queue_position == last_position:
+            db.session.delete(group)
+    
+    db.session.commit()
+    
+    message = f'You left the {"court" if not group.is_in_queue else "queue"} group for {court_name}'
+    flash(message, 'warning')
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'court_id': court.id,
+            'message': message
+        })
+    
+    return redirect(url_for('home'))
 
 @app.route('/admin')
 def admin():
     if 'user' not in session:
         return redirect(url_for('login'))
     
-    username = session['user']
-    user = User.query.filter_by(username=username).first()
-    courts = Court.query.all()
-    users = User.query.all()
+    user = User.query.filter_by(username=session['user']).first()
     if not user or not user.is_admin:
-
-        # optional: don't even give this warning, just redirect to home immediately?
         flash('You do not have permission to access the admin page', 'error')
         return redirect(url_for('home'))
+    
     return render_template('admin.html', 
-                         courts=courts,
-                         users=users)  # Pass users to the template
+                         courts=Court.query.all(),
+                         users=User.query.all())
 
+@app.route('/admin/<action>', methods=['POST'])
+def admin_actions(action):
+    """Consolidated admin actions endpoint"""
+    if not _is_admin():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json() or {}
+    
+    if action == 'remove-player-from-group':
+        return _admin_remove_player(data.get('player_id'))
+    elif action == 'move-player':
+        return _admin_move_player(data.get('player_id'), data.get('group_id'))
+    elif action == 'create-group':
+        return _admin_create_group(data.get('court_id'), data.get('is_queue', False))
+    else:
+        return jsonify({'success': False, 'message': 'Invalid action'}), 400
+
+def _is_admin():
+    """Helper to check admin status"""
+    if 'user' not in session:
+        return False
+    user = User.query.filter_by(username=session['user']).first()
+    return user and user.is_admin
+
+def _admin_remove_player(player_id):
+    """Remove player from their group"""
+    if not player_id:
+        return jsonify({'success': False, 'message': 'Missing player_id'})
+    
+    player = User.query.get(player_id)
+    if not player:
+        return jsonify({'success': False, 'message': 'Player not found'})
+    
+    player.group = None
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Player removed successfully'})
+
+def _admin_move_player(player_id, group_id):
+    """Move player to a different group"""
+    if not player_id or not group_id:
+        return jsonify({'success': False, 'message': 'Missing required parameters'})
+    
+    player = User.query.get(player_id)
+    group = Group.query.get(group_id)
+    
+    if not player:
+        return jsonify({'success': False, 'message': 'Player not found'})
+    if not group:
+        return jsonify({'success': False, 'message': 'Group not found'})
+    if len(group.players) >= MAX_PLAYERS:
+        return jsonify({'success': False, 'message': 'Group is full'})
+    
+    # Clean up old empty group if needed
+    old_group = player.group
+    if old_group and len(old_group.players) == 1 and old_group.is_in_queue:
+        db.session.delete(old_group)
+    
+    player.group = group
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Player moved successfully'})
+@app.route('/admin/remove-queue-group', methods=['POST'])
+def admin_remove_queue_group():
+    """Admin function to remove a queue group"""
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_user = User.query.filter_by(username=session['user']).first()
+    if not current_user or not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    group_id = data.get('group_id')
+    
+    if not group_id:
+        return jsonify({'success': False, 'message': 'Missing group_id'})
+    
+    group = Group.query.get(group_id)
+    
+    if not group:
+        return jsonify({'success': False, 'message': 'Group not found'})
+    
+    if not group.is_in_queue:
+        return jsonify({'success': False, 'message': 'This is not a queue group'})
+    
+    court = group.court
+    removed_position = group.queue_position
+    
+    # Remove all players from the group first
+    for player in group.players:
+        player.group = None
+    
+    # Delete the group
+    db.session.delete(group)
+    
+    # Reorder remaining queue positions
+    remaining_queue_groups = Group.query.filter(
+        Group.court_id == court.id,
+        Group.is_in_queue == True,
+        Group.queue_position > removed_position
+    ).order_by(Group.queue_position).all()
+    
+    # Move all groups after the removed one up by one position
+    for queue_group in remaining_queue_groups:
+        queue_group.queue_position -= 1
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Queue group removed successfully'})
+def _admin_create_group(court_id, is_queue):
+    """Create a new group on a court"""
+    if not court_id:
+        return jsonify({'success': False, 'message': 'Missing court_id'})
+    
+    court = Court.query.get(court_id)
+    if not court:
+        return jsonify({'success': False, 'message': 'Court not found'})
+    
+    if is_queue:
+        next_position = get_next_queue_position(court)
+        new_group = Group(court=court, is_in_queue=True, queue_position=next_position)
+    else:
+        new_group = Group(court=court, is_in_queue=False, queue_position=None)
+    
+    db.session.add(new_group)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': f'Created new {"queue" if is_queue else "active"} group',
+        'group_id': new_group.id
+    })
 
 @app.route('/timer/start', methods=['POST'])
 def start_timer():
@@ -461,6 +620,7 @@ def start_timer():
         'remaining': timer_state.remaining_time,
         'end_time': timer_state.end_time
     })
+
 @app.route('/timer/status')
 def get_timer_status():
     timer_state = TimerState.query.first()
@@ -472,7 +632,7 @@ def get_timer_status():
         remaining = max(0, timer_state.remaining_time - elapsed)
 
         if remaining <= 0.1:
-            app.logger.info("⏰ Timer expired — rotating players!")
+            app.logger.info("⏰ Timer expired — rotating groups!")
 
             # Mark timer as stopped
             timer_state.is_running = False
@@ -480,24 +640,45 @@ def get_timer_status():
             timer_state.start_time = None
             timer_state.end_time = None
 
-            # Clear players safely
+            # Process each court
             for court in courts:
-                for player in court.players[:]:
-                    player.court = None
-
-            db.session.flush()
-
-            for court in courts:
-                print(f"Checking court {court.name} for players and queue")
-                while len(court.players) < MAX_PLAYERS and court.queue:
-                    print(f"queue currently: {[entry.user.username for entry in court.queue]}")
-                    next_entry = court.queue[0]
-                    print(f"Promoting {next_entry.user.username} to court {court.name}")
-                    court.players.append(next_entry.user)  # Add to players
-                    court.queue = court.queue[1:]  # Remove from queue
-                    db.session.delete(next_entry)  # Remove from queue
-                    for i, entry in enumerate(court.queue[1:], 1):
-                        entry.position = i
+                # Get active groups on court and queue groups
+                active_groups = [g for g in court.groups if not g.is_in_queue]
+                queue_groups = sorted(
+                    [g for g in court.groups if g.is_in_queue],
+                    key=lambda g: g.queue_position
+                )
+                
+                # Remove all groups from court
+                for group in active_groups:
+                    # If the group has no players, just delete it
+                    if not group.players:
+                        db.session.delete(group)
+                    else:
+                        # Otherwise mark as deleted - will be fully removed after commit
+                        db.session.delete(group)
+                
+                # Promote queue groups to court if available
+                for queue_group in queue_groups[:1]:  # Only promote first group
+                    queue_group.is_in_queue = False
+                    queue_group.queue_position = None
+                
+                # Reorder remaining queue
+                remaining_queue = queue_groups[1:] if queue_groups else []
+                for idx, group in enumerate(remaining_queue):
+                    group.queue_position = idx + 1
+                
+                # Ensure there's always an active group on the court
+                # Check if court now has any active groups
+                has_active_group = any(not g.is_in_queue for g in court.groups)
+                if not has_active_group:
+                    # Create a new empty active group
+                    new_active_group = Group(
+                        court=court,
+                        is_in_queue=False,
+                        queue_position=None
+                    )
+                    db.session.add(new_active_group)
 
             db.session.commit()
 
@@ -606,7 +787,6 @@ def stop_timer():
         'status': 'success',
         'remaining': timer_state.remaining_time
     })
-
 @app.route('/clear-courts', methods=['POST'])
 def clear_courts():
     username = session.get('user')
@@ -617,20 +797,59 @@ def clear_courts():
     if not user or not user.is_admin:
         return jsonify({'error': 'Unauthorized'}), 401
 
-    # Clear all courts
+    # Clear all groups from all courts
+    users = User.query.all()
+    for user in users:
+        user.group = None
+    
+    groups = Group.query.all()
+    for group in groups:
+        db.session.delete(group)
+    
+    db.session.commit()
+    
+    # Create one empty active group per court
     courts = Court.query.all()
     for court in courts:
-        # Clear players
-        for player in court.players:
-            player.court = None
-        
-        # Clear queue
-        for entry in court.queue:
-            db.session.delete(entry)
+        active_group = Group(
+            court=court,
+            is_in_queue=False,
+            queue_position=None
+        )
+        db.session.add(active_group)
     
     db.session.commit()
     return jsonify({'status': 'success', 'message': 'All courts cleared'})
 
+@app.route('/create-empty-active-group/<int:court_id>', methods=['POST'])
+def create_empty_active_group(court_id):
+    court = Court.query.get(court_id)
+    if not court:
+        return jsonify({'success': False, 'message': 'Court not found'})
+    
+    # Check if there's already an active group
+    existing_active = Group.query.filter_by(court=court, is_in_queue=False).first()
+    if existing_active:
+        return jsonify({
+            'success': True, 
+            'group_id': existing_active.id,
+            'message': 'Using existing active group'
+        })
+    
+    # Create a new empty active group
+    active_group = Group(
+        court=court,
+        is_in_queue=False,
+        queue_position=None
+    )
+    db.session.add(active_group)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'group_id': active_group.id,
+        'message': 'Created new active group'
+    })
 @app.route('/toggle-club-status', methods=['POST'])
 def toggle_club_status():
     username = session.get('user')
@@ -659,28 +878,59 @@ def get_club_status():
         'last_modified': club_state.last_modified.timestamp()
     })
 
+import hashlib
+
 @app.route('/court-updates')
 def court_updates():
     def generate():
+        last_hash = None
         while True:
             with app.app_context():
                 courts = Court.query.all()
-                #print("=== Court state ===")
-                #for c in courts:
-                #    print(f"{c.name} | Players: {[p.username for p in c.players]} | Queue: {[e.user.username for e in c.queue]}")
-
+                
                 court_data = {}
                 for court in courts:
+                    # Get active groups on court
+                    active_groups = [g for g in court.groups if not g.is_in_queue]
+                    active_group_data = [{
+                        'id': g.id,
+                        'players': [p.username for p in g.players],
+                        'is_full': len(g.players) >= MAX_PLAYERS
+                    } for g in active_groups]
+                    
+                    # Get queue groups
+                    queue_groups = sorted(
+                        [g for g in court.groups if g.is_in_queue],
+                        key=lambda g: g.queue_position
+                    )
+                    queue_group_data = [{
+                        'id': g.id,
+                        'position': g.queue_position,
+                        'players': [p.username for p in g.players],
+                        'is_full': len(g.players) >= MAX_PLAYERS
+                    } for g in queue_groups]
+                    
                     court_data[court.name] = {
-                        'players': [player.username for player in court.players],
-                        'queue': [entry.user.username for entry in court.queue]
+                        'id': court.id,
+                        'active_groups': active_group_data,
+                        'queue_groups': queue_group_data
                     }
-                data = f"data: {json.dumps({'courts': court_data})}\n\n"
-                yield data
+                
+                # Calculate a hash of the data to see if it has changed
+                court_json = json.dumps({'courts': court_data})
+                current_hash = hashlib.md5(court_json.encode()).hexdigest()
+                
+                # Only send an update if the data has changed
+                if current_hash != last_hash:
+                    last_hash = current_hash
+                    data = f"data: {court_json}\n\n"
+                    yield data
+                    
             sleep(1)
     
     return Response(generate(), mimetype='text/event-stream')
 
+# Also update the poll endpoint for consistency
 @app.route('/court-updates-poll')
 def court_updates_poll():
     """Fallback endpoint for environments where SSE doesn't work"""
@@ -688,13 +938,39 @@ def court_updates_poll():
     
     court_data = {}
     for court in courts:
+        # Get active groups on court
+        active_groups = [g for g in court.groups if not g.is_in_queue]
+        active_group_data = [{
+            'id': g.id,
+            'players': [p.username for p in g.players],
+            'is_full': len(g.players) >= MAX_PLAYERS
+        } for g in active_groups]
+        
+        # Get queue groups
+        queue_groups = sorted(
+            [g for g in court.groups if g.is_in_queue],
+            key=lambda g: g.queue_position
+        )
+        queue_group_data = [{
+            'id': g.id,
+            'position': g.queue_position,
+            'players': [p.username for p in g.players],
+            'is_full': len(g.players) >= MAX_PLAYERS
+        } for g in queue_groups]
+        
         court_data[court.name] = {
-            'players': [player.username for player in court.players],
-            'queue': [entry.user.username for entry in court.queue]
+            'id': court.id,
+            'active_groups': active_group_data,
+            'queue_groups': queue_group_data
         }
     
-    return jsonify({'courts': court_data})
-
+    # Add a timestamp to the data
+    response_data = {
+        'courts': court_data,
+        'timestamp': datetime.now().timestamp()
+    }
+    
+    return jsonify(response_data)
 
 if __name__ == '__main__':
     with app.app_context():
@@ -709,7 +985,6 @@ if __name__ == '__main__':
                 db.session.add(court)
 
         # Create default TimerState if none exists
-        # app.logger.info("Checking for TimerState...")
         if not TimerState.query.first():
             timer_state = TimerState(is_running=False)  # adjust fields as per your model
             db.session.add(timer_state)
@@ -718,7 +993,8 @@ if __name__ == '__main__':
         if not ClubState.query.first():
             club_state = ClubState()  # fill in default fields if needed
             db.session.add(club_state)
-
+        
+        # Add admin user if not exists
         if not User.query.filter_by(username='admin').first():
             admin = User(
                 username='admin',
@@ -726,8 +1002,8 @@ if __name__ == '__main__':
                 is_admin=True
             )
             db.session.add(admin)
-            # print("Created admin user")
-                # Add test users a, b, c
+            
+        # Add test users
         test_users = ['a', 'b', 'c']
         for username in test_users:
             if not User.query.filter_by(username=username).first():
@@ -737,7 +1013,24 @@ if __name__ == '__main__':
                     is_admin=False
                 )
                 db.session.add(user)
-                print(f"Created test user: {username}")
-
+                
+        # Commit to create courts and users first
         db.session.commit()
+                
+        # Create one empty active group per court
+        courts = Court.query.all()
+        for court in courts:
+            # Check if court already has an active group
+            existing_active = Group.query.filter_by(court=court, is_in_queue=False).first()
+            if not existing_active:
+                active_group = Group(
+                    court=court,
+                    is_in_queue=False,
+                    queue_position=None
+                )
+                db.session.add(active_group)
+                
+        # Commit all changes
+        db.session.commit()
+        
     app.run(host="0.0.0.0", port=5001, debug=True)

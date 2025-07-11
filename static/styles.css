@@ -97,11 +97,10 @@ body {
 }
 
 /* Update the timer title styles to match court management title */
-.timer-title {
+.timer-title, .court-management-title {
     font-size: 22px;
     font-weight: 600;
     margin: 0 0 24px 0;
-    text-align: left; /* Change from center to left */
 }
 
 /* Remove the timer header styling since we're not using it anymore */
@@ -255,6 +254,7 @@ button:disabled {
     font-size: 13px;
     color: var(--system-blue);
     font-weight: 500;
+    transition: opacity 0.2s ease;
 }
 
 .current-players li:enter, .queue li:enter {
@@ -293,12 +293,6 @@ button:disabled {
 
 .player-name {
     flex: 1;
-}
-
-.player-indicator {
-    font-size: 13px;
-    color: var(--system-blue);
-    font-weight: 500;
 }
 
 .inactive-message {
@@ -472,13 +466,93 @@ button:disabled {
 }
 
 .flash-message {
-    padding: 12px;
-    margin-bottom: 16px;
-    border-radius: 10px;
-    background: var(--background-secondary);
-    color: var(--text-primary);
-    font-size: 15px;
-    text-align: center;
+  padding: 12px 16px;  /* Slightly smaller padding */
+  border-radius: 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  color: white;
+  font-size: 14px;  /* Smaller font */
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(20px);  /* Come from bottom instead */
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  text-align: left; /* Left align text */
+}
+
+/* Add subtle icons to different message types */
+.flash-message::before {
+  content: "";
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.flash-message.success::before {
+  content: "✓";
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.flash-message.error::before {
+  content: "✕";
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.flash-message.warning::before {
+  content: "!";
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.flash-message.message::before {
+  content: "i";
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+/* Fade in from bottom */
+.flash-message.fade-in {
+  opacity: 0.95;  /* Not fully opaque */
+  transform: translateY(0);
+}
+
+/* Fade out to bottom */
+.flash-message.fade-out {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.flash-messages {
+  position: fixed;
+  bottom: 20px;  /* Move to bottom instead of top */
+  right: 20px;
+  z-index: 1000;
+  max-width: 80%;
+  width: 300px;  /* Smaller width */
 }
 
 .footer {
@@ -834,7 +908,7 @@ button:disabled {
     background-color: var(--system-blue);
     color: white;
     padding: 8px 16px;
-    border-radius: 10px;
+    border-radius: 4px;
     font-size: 15px;
     font-weight: 500;
     text-decoration: none;
@@ -939,4 +1013,525 @@ button:disabled {
     margin-bottom: 24px;
     font-size: 22px;
     font-weight: 600;
+}
+
+/* Group styles */
+.court-group, .queue-groups {
+  margin-top: 12px;
+}
+
+.player-group, .queue-group {
+  background: var(--background-secondary);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.player-slot {
+  background: var(--background-primary);
+  border-radius: 8px;
+  padding: 10px 14px;
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.player-slot.occupied {
+  border-left: 4px solid var(--system-green);
+}
+
+.player-slot.empty {
+  border-left: 4px solid var(--text-secondary);
+  opacity: 0.7;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.player-slot.empty:hover {
+  opacity: 1;
+  background-color: var(--background-secondary);
+  transform: translateY(-3px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.player-slot.empty:active {
+  transform: translateY(-1px);
+}
+
+/* Base styling for my-slot - applies to both court and queue */
+.player-slot.my-slot {
+  position: relative;
+  overflow: hidden;
+  border-left: 4px solid var(--system-blue) !important;
+}
+
+/* Create a fixed-position container for the leave button that slides in */
+.player-slot.my-slot::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 0; /* Start with zero width */
+  background-color: var(--system-red);
+  transition: none; /* No transition by default */
+  z-index: 1;
+}
+
+/* Special class for when transitions should be allowed */
+.player-slot.my-slot.allow-transitions::after {
+  transition: width 0.25s ease; /* Add transition only when needed */
+}
+
+/* Width expansion on hover/tap */
+.player-slot.my-slot:hover::after,
+.player-slot.my-slot.show-leave-button::after {
+  width: 60px;
+}
+
+/* The leave button itself - positioned at the right edge */
+.leave-button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  background-color: transparent;
+  color: white;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  height: 100%;
+  z-index: 2;
+  opacity: 0; /* Initially invisible */
+  transition: none; /* No transition by default */
+}
+
+/* Allow transitions when needed */
+.player-slot.my-slot.allow-transitions .leave-button {
+  transition: opacity 0.15s ease 0.1s; /* Slight delay for better sequence */
+}
+
+/* Button visibility states */
+.player-slot.my-slot:not(:hover):not(.show-leave-button) .leave-button {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.player-slot.my-slot:hover .leave-button,
+.player-slot.my-slot.show-leave-button .leave-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Keep content in place (no movement) */
+.player-slot.my-slot .player-name,
+.player-slot.my-slot .player-indicator {
+  position: relative;
+  z-index: 1;
+  transition: none; /* No transition by default */
+}
+
+/* Add transitions when needed */
+.player-slot.my-slot.allow-transitions .player-name,
+.player-slot.my-slot.allow-transitions .player-indicator {
+  transition: opacity 0.2s ease; /* Only fade, no movement */
+}
+
+/* Fade out text when button shows */
+.player-slot.my-slot:hover .player-name,
+.player-slot.my-slot:hover .player-indicator,
+.player-slot.my-slot.show-leave-button .player-name,
+.player-slot.my-slot.show-leave-button .player-indicator {
+  opacity: 0.2; /* Fade but don't hide completely */
+}
+
+/* Global animation suppression */
+.suppress-animations * {
+  transition: none !important;
+  animation: none !important;
+}
+
+.slot-placeholder {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+
+.queue-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.create-group-container {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.create-group-button {
+  background-color: var(--system-blue);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.create-group-button:hover {
+  background-color: #0062CC;
+  transform: translateY(-2px);
+}
+
+.leave-group-button {
+  margin-top: 16px;
+  width: 100%;
+}
+
+/* Add these styles for the admin panel's group display */
+
+.admin-group-card, .admin-queue-group {
+  background-color: var(--background-secondary);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.admin-group-header, .admin-queue-header {
+  padding: 8px 12px;
+  background-color: var(--system-blue);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.admin-queue-header .queue-number {
+  background-color: white;
+  color: var(--system-blue);
+  margin-right: 6px;
+}
+
+.admin-group-members, .admin-queue-members {
+  padding: 8px;
+}
+
+.admin-group-members .player-item, 
+.admin-queue-members .player-item {
+  background-color: var(--background-primary);
+  margin-bottom: 4px;
+  border-left: 3px solid var(--system-green);
+}
+
+.admin-group-members .empty-admin-message,
+.admin-queue-members .empty-admin-message {
+  background-color: var(--background-primary);
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.loading-slot {
+  opacity: 0.4;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+  100% { opacity: 0.4; }
+}
+
+/* Admin Player Management Styles */
+.admin-player-item {
+    background-color: var(--background-primary);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 3px solid var(--system-green);
+}
+
+.admin-player-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.admin-move-player-btn,
+.admin-remove-player-btn,
+.admin-add-player-btn {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    border: none;
+    color: white;
+}
+
+.admin-move-player-btn {
+    background-color: var(--system-blue);
+}
+
+.admin-remove-player-btn {
+    background-color: var(--system-red);
+}
+
+.admin-add-player-btn {
+    background-color: var(--system-green);
+}
+
+.admin-create-group-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 8px;
+    background-color: var(--system-blue);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.admin-remove-group-btn {
+    background-color: var(--system-red);
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+}
+
+.admin-group-header, 
+.admin-queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.admin-group-actions {
+    display: flex;
+    gap: 5px;
+}
+
+/* Modal Styles */
+.admin-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.admin-modal-content {
+    background-color: var(--background-primary);
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 12px;
+    width: 80%;
+    max-width: 500px;
+}
+
+.admin-modal-close {
+    color: var(--text-secondary);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.admin-modal h4 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.admin-modal .form-group {
+    margin-bottom: 15px;
+}
+
+.admin-modal label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.admin-modal select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: var(--background-secondary);
+    color: var(--text-primary);
+}
+
+.admin-modal button {
+    padding: 10px 20px;
+    background-color: var(--system-blue);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+/* Add this to styles.css */
+.admin-player-slot {
+    position: relative;
+    overflow: visible;
+}
+
+.admin-player-slot .player-name {
+    margin-right: 70px;
+}
+
+.admin-leave-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 70px;
+    background-color: var(--system-red);
+    color: white;
+    border: none;
+    font-size: 12px;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.admin-leave-button:hover {
+    opacity: 1;
+}
+
+.admin-court-section {
+    margin-bottom: 30px;
+}
+
+.admin-court-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.admin-court-actions .create-group-button {
+    background-color: var(--system-blue);
+    margin: 0 5px;
+}
+
+.admin-create-button {
+    min-width: 180px;
+}
+
+.empty.player-slot {
+    cursor: pointer;
+}
+
+.empty.player-slot:hover {
+    background-color: var(--background-secondary);
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+}
+
+/* Add this CSS to styles.css */
+.admin-empty-slot {
+    cursor: pointer;
+    background-color: var(--background-primary);
+    transition: all 0.2s ease;
+}
+
+.admin-empty-slot:hover {
+    background-color: rgba(0, 122, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.admin-empty-slot .slot-placeholder {
+    width: 100%;
+    text-align: center;
+}
+
+.admin-empty-slot:hover .slot-placeholder {
+    color: var(--system-blue);
+}
+
+.admin-empty-slot:hover::before {
+    content: "+";
+    display: inline-block;
+    margin-right: 5px;
+    font-weight: bold;
+    color: var(--system-blue);
+}
+
+.admin-remove-queue-btn {
+    background-color: var(--system-red);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: all 0.2s ease;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 10;
+    line-height: 1;
+    padding: 0; /* Remove any inherited padding */
+    margin: 0; /* Remove any inherited margin */
+    min-width: 20px; /* Ensure minimum width */
+    min-height: 20px; /* Ensure minimum height */
+    max-width: 20px; /* Prevent it from getting larger */
+    max-height: 20px; /* Prevent it from getting larger */
+}
+
+.admin-remove-queue-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.queue-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-bottom: 8px;
+}
+
+.queue-group {
+    position: relative;
+    padding-top: 8px;
+    padding-right: 8px;
 }
