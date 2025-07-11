@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="notes-container">
+    <div class="notes-header">
+        <h1>frequently asked questions</h1>
+        <a href="{{ url_for('home') }}" class="nav-button">Back to Home</a>
+    </div>
+    
+    <div class="notes-content">
+        <div class="notes-section">
+            <h3>how does the queue system work?</h3>
+            <p>When the timer expires, the first group in queue automatically moves to the court, and all other queue groups move up one position. Players previously on court need to re-queue once their time is up.</p>
+        </div>
+        <div class="notes-section">
+            <h3>how do I join a game?</h3>
+            <p>Click on any empty slot in an active court group or queue group to join. If there are no empty slots, you can create a new group by clicking the "Create New Group" button.</p>
+        </div>
+        <div class="notes-section">
+            <h3>why can't I click on any empty slots?</h3>
+            <p>You are either not logged in or you are already in an existing court/queue.</p>
+        </div>
+        <div class="notes-section">
+            <h3>I'm currently on court, why can't I leave?</h3>
+            <p>You cannot leave a court while the timer is running. This is to prevent players from queueing early while they are still playing.</p>
+        </div>
+        <div class="notes-section">
+            <h3>I am currently on court X and want to move/swap to court Y to play with my friends, how can I do this?</h3>
+            <p>If there is an empty spot, you can leave your current court/queue and rejoin on the court you are interested in. If you're looking to switch places with someone on another court, please ask a club officer for assistance. In general this would require all affected member(s) to agree to the switch.</p>
+        </div>
+        <div class="notes-section">
+            <h3>I'm having some other kind of technical issues, what should I do?</h3>
+            <p>First try refreshing (the page may lag on occasion). Otherwise, check that you are logged in, and that you are not already on a court. If there are any other questions please ask an admin.</p>
+        </div>
+
+        <div class="notes-section">
+            <h3>this website sucks, I think I could do a better job, how can I contribute?</h3>
+            <p>Feel free to either open a pull request or 'officially' join the team to help us maintain/improve the app! please reach out to a board member for details.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

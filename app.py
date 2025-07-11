@@ -874,6 +874,10 @@ def toggle_club_status():
 def technical_notes():
     return render_template('technical_notes.html')
 
+@app.route('/faq')
+def faq():
+    return render_template('faq.html')
+    
 @app.route('/club-status')
 def get_club_status():
     club_state = ClubState.query.first()

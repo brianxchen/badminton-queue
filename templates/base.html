@@ -43,10 +43,12 @@
         
         <footer class="footer">
             <p>made with {{ signature }} by brian</p>
+            <div class="footer-links">
+                <a href="{{ url_for('faq') }}" class="footer-link">faq</a>
+                <span class="footer-separator">•</span>
+                <a href="{{ url_for('technical_notes') }}" class="footer-link">technical notes</a>
+            </div>
         </footer>
-        <div class="footer-links">
-            <a href="{{ url_for('technical_notes') }}" class="footer-link">technical notes</a>
-        </div>
     </div>
 
     <script src="{{ url_for('static', filename='theme.js') }}"></script>
