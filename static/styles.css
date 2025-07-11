@@ -1260,3 +1260,232 @@ button:disabled {
   50% { opacity: 0.7; }
   100% { opacity: 0.4; }
 }
+
+/* Admin Player Management Styles */
+.admin-player-item {
+    background-color: var(--background-primary);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 3px solid var(--system-green);
+}
+
+.admin-player-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.admin-move-player-btn,
+.admin-remove-player-btn,
+.admin-add-player-btn {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    border: none;
+    color: white;
+}
+
+.admin-move-player-btn {
+    background-color: var(--system-blue);
+}
+
+.admin-remove-player-btn {
+    background-color: var(--system-red);
+}
+
+.admin-add-player-btn {
+    background-color: var(--system-green);
+}
+
+.admin-create-group-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 8px;
+    background-color: var(--system-blue);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.admin-remove-group-btn {
+    background-color: var(--system-red);
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+}
+
+.admin-group-header, 
+.admin-queue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.admin-group-actions {
+    display: flex;
+    gap: 5px;
+}
+
+/* Modal Styles */
+.admin-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow: auto;
+}
+
+.admin-modal-content {
+    background-color: var(--background-primary);
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 12px;
+    width: 80%;
+    max-width: 500px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.admin-modal-close {
+    color: var(--text-secondary);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.admin-modal h4 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.admin-modal .form-group {
+    margin-bottom: 15px;
+}
+
+.admin-modal label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.admin-modal select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--background-secondary);
+    color: var(--text-primary);
+    font-size: 16px;
+}
+
+.admin-modal button {
+    padding: 10px 20px;
+    background-color: var(--system-blue);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+/* Add this to styles.css */
+.admin-player-slot {
+    position: relative;
+    overflow: visible;
+}
+
+.admin-player-slot .player-name {
+    margin-right: 70px;
+}
+
+.admin-leave-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 70px;
+    background-color: var(--system-red);
+    color: white;
+    border: none;
+    font-size: 12px;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.admin-leave-button:hover {
+    opacity: 1;
+}
+
+.admin-court-section {
+    margin-bottom: 30px;
+}
+
+.admin-court-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.admin-court-actions .create-group-button {
+    background-color: var(--system-blue);
+    margin: 0 5px;
+}
+
+.admin-create-button {
+    min-width: 180px;
+}
+
+.empty.player-slot {
+    cursor: pointer;
+}
+
+.empty.player-slot:hover {
+    background-color: var(--background-secondary);
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+}
+
+/* Add this CSS to styles.css */
+.admin-empty-slot {
+    cursor: pointer;
+    background-color: var(--background-primary);
+    transition: all 0.2s ease;
+}
+
+.admin-empty-slot:hover {
+    background-color: rgba(0, 122, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.admin-empty-slot .slot-placeholder {
+    width: 100%;
+    text-align: center;
+}
+
+.admin-empty-slot:hover .slot-placeholder {
+    color: var(--system-blue);
+}
+
+.admin-empty-slot:hover::before {
+    content: "+";
+    display: inline-block;
+    margin-right: 5px;
+    font-weight: bold;
+    color: var(--system-blue);
+}
