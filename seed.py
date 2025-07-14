@@ -14,7 +14,7 @@ with app.app_context():
 
     # Create default TimerState if none exists
     if not TimerState.query.first():
-        timer_state = TimerState(is_running=False)  # adjust fields as per your model
+        timer_state = TimerState(is_running=False)
         db.session.add(timer_state)
 
     # Create default ClubState if none exists
