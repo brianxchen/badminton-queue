@@ -2018,3 +2018,91 @@ button:disabled {
         max-width: 120px;
     }
 }
+
+
+/* Recent Groups Styles */
+.recent-groups-section {
+    margin: 24px 0;
+}
+
+.recent-groups-description {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.recent-groups-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.recent-group-item {
+    background-color: var(--background-secondary);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid var(--system-blue);
+}
+
+.recent-group-info {
+    flex: 1;
+}
+
+.recent-group-court {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.recent-group-players {
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.recent-group-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.rejoin-group-button {
+    background-color: var(--system-blue);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 16px;
+}
+
+.rejoin-group-button:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.rejoin-group-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .recent-group-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    
+    .rejoin-group-button {
+        margin-left: 0;
+        text-align: center;
+    }
+}

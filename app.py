@@ -1,6 +1,6 @@
 from flask import Flask, render_template, url_for, session, redirect, request, jsonify, send_from_directory, Response, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 import time
 import json
 import random
@@ -25,6 +25,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+EST = timezone(timedelta(hours=-5))  # EST is UTC-5
 
 class Court(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -122,6 +124,29 @@ class Group(db.Model):
             'queue_position': self.queue_position,
             'players': [player.username for player in self.players],
             'is_full': self.is_full()
+        }
+
+class RecentGroup(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    court_id = db.Column(db.Integer, db.ForeignKey('court.id'), nullable=False)
+    player_usernames = db.Column(db.Text, nullable=False)  # JSON string of usernames
+    rotated_at = db.Column(db.DateTime, default=datetime.utcnow)  # Store in UTC
+    expires_at = db.Column(db.DateTime, nullable=False)  # Store in UTC
+    
+    court = db.relationship('Court')
+    
+    def to_dict(self):
+        # Convert UTC to EST for display
+        rotated_at_est = self.rotated_at.replace(tzinfo=timezone.utc).astimezone(EST)
+        expires_at_est = self.expires_at.replace(tzinfo=timezone.utc).astimezone(EST)
+        
+        return {
+            'id': self.id,
+            'court_id': self.court_id,
+            'court_name': self.court.name,
+            'players': json.loads(self.player_usernames),
+            'rotated_at': rotated_at_est.strftime('%H:%M:%S'),
+            'expires_at': expires_at_est.strftime('%H:%M:%S')
         }
 @app.route('/admin/users')
 def get_all_users():
@@ -410,6 +435,7 @@ def signup():
         flash('Account submitted for approval! An admin will review your request.', 'info')
         return redirect(url_for('login'))
     return render_template('signup.html')
+
 @app.route('/admin/pending-users')
 def get_pending_users():
     """Get all pending users for admin approval"""
@@ -865,14 +891,22 @@ def get_timer_status():
                     key=lambda g: g.queue_position
                 )
                 
+                # SAVE ACTIVE GROUPS BEFORE REMOVING THEM
+                for group in active_groups:
+                    if group.players:  # Only save groups that have players
+                        # Create a recent group record
+                        player_usernames = [p.username for p in group.players]
+                        recent_group = RecentGroup(
+                            court_id=court.id,
+                            player_usernames=json.dumps(player_usernames),
+                            rotated_at=datetime.utcnow(),
+                            expires_at=datetime.utcnow() + timedelta(minutes=5)  # 5 minute window to rejoin
+                        )
+                        db.session.add(recent_group)
+                
                 # Remove all groups from court
                 for group in active_groups:
-                    # If the group has no players, just delete it
-                    if not group.players:
-                        db.session.delete(group)
-                    else:
-                        # Otherwise mark as deleted - will be fully removed after commit
-                        db.session.delete(group)
+                    db.session.delete(group)
                 
                 # Promote queue groups to court if available
                 for queue_group in queue_groups[:1]:  # Only promote first group
@@ -885,10 +919,8 @@ def get_timer_status():
                     group.queue_position = idx + 1
                 
                 # Ensure there's always an active group on the court
-                # Check if court now has any active groups
                 has_active_group = any(not g.is_in_queue for g in court.groups)
                 if not has_active_group:
-                    # Create a new empty active group
                     new_active_group = Group(
                         court=court,
                         is_in_queue=False,
@@ -912,6 +944,12 @@ def get_timer_status():
             'courts': [court.to_dict() for court in courts]
         })
 
+    # Clean up expired recent groups periodically
+    expired_groups = RecentGroup.query.filter(RecentGroup.expires_at < datetime.utcnow()).all()
+    for expired in expired_groups:
+        db.session.delete(expired)
+    db.session.commit()
+
     # When timer not running, always reset to default time!
     if timer_state and not timer_state.is_running and timer_state.remaining_time == 0:
         DEFAULT_DURATION = 900  # 15 min
@@ -924,7 +962,6 @@ def get_timer_status():
         'expired': False,
         'courts': [court.to_dict() for court in courts]
     })
-
 
 @app.route('/timer/reset', methods=['POST'])
 def reset_timer():
@@ -1036,6 +1073,174 @@ def clear_courts():
     
     db.session.commit()
     return jsonify({'status': 'success', 'message': 'All courts cleared'})
+@app.route('/recent-groups')
+def get_recent_groups():
+    """Get recent groups that the current user was part of"""
+    if 'user' not in session:
+        return jsonify({'recent_groups': []})
+    
+    username = session['user']
+    
+    # Clean up expired groups first
+    expired_groups = RecentGroup.query.filter(RecentGroup.expires_at < datetime.utcnow()).all()
+    for expired in expired_groups:
+        db.session.delete(expired)
+    db.session.commit()
+    
+    # Get recent groups where the current user was a member
+    recent_groups = RecentGroup.query.filter(
+        RecentGroup.expires_at > datetime.utcnow()
+    ).order_by(RecentGroup.rotated_at.desc()).all()
+    
+    # Filter to only groups that include the current user
+    user_recent_groups = []
+    for group in recent_groups:
+        players = json.loads(group.player_usernames)
+        if username in players:
+            user_recent_groups.append(group.to_dict())
+    
+    return jsonify({'recent_groups': user_recent_groups})
+
+@app.route('/rejoin-with-group/<int:recent_group_id>', methods=['POST'])
+def rejoin_with_group(recent_group_id):
+    """Rejoin the queue with a recent group"""
+    if 'user' not in session:
+        return jsonify({'success': False, 'message': 'You must be logged in'}), 401
+    
+    username = session['user']
+    user = User.query.filter_by(username=username).first()
+    
+    if not user.is_active:
+        return jsonify({'success': False, 'message': 'Your account is not active'})
+    
+    if user.group:
+        return jsonify({'success': False, 'message': 'You are already in a group'})
+    
+    # Get the recent group
+    recent_group = RecentGroup.query.get(recent_group_id)
+    if not recent_group:
+        return jsonify({'success': False, 'message': 'Recent group not found'})
+    
+    # Check if it's expired
+    if recent_group.expires_at < datetime.utcnow():
+        db.session.delete(recent_group)
+        db.session.commit()
+        return jsonify({'success': False, 'message': 'Group rejoin window has expired'})
+    
+    # Check if user was actually in this group
+    players = json.loads(recent_group.player_usernames)
+    if username not in players:
+        return jsonify({'success': False, 'message': 'You were not in this group'})
+    
+    # Get the court
+    court = Court.query.get(recent_group.court_id)
+    if not court:
+        return jsonify({'success': False, 'message': 'Court not found'})
+    
+    # Check if any of the other players are already in groups
+    other_players = [p for p in players if p != username]
+    busy_players = []
+    available_players = []
+    
+    for player_name in other_players:
+        player = User.query.filter_by(username=player_name).first()
+        if player and player.group:
+            busy_players.append(player_name)
+        elif player and player.is_active:
+            available_players.append(player)
+    
+    if busy_players:
+        return jsonify({
+            'success': False, 
+            'message': f'Cannot rejoin: {", ".join(busy_players)} {"is" if len(busy_players) == 1 else "are"} already in other groups'
+        })
+    
+    # Check if the court is empty (no active groups with players)
+    active_groups_with_players = [g for g in court.groups if not g.is_in_queue and g.players]
+    court_is_empty = len(active_groups_with_players) == 0
+    
+    if court_is_empty:
+        # Rejoin directly on the court
+        # Find or create an empty active group
+        empty_active_group = None
+        for group in court.groups:
+            if not group.is_in_queue and not group.players:
+                empty_active_group = group
+                break
+        
+        if not empty_active_group:
+            # Create a new active group if none exists
+            empty_active_group = Group(
+                court=court,
+                is_in_queue=False,
+                queue_position=None
+            )
+            db.session.add(empty_active_group)
+            db.session.flush()  # Get the group ID
+        
+        # Add the current user to the active group
+        user.group = empty_active_group
+        
+        # Add all available players to the group
+        added_players = [username]
+        for player in available_players:
+            player.group = empty_active_group
+            added_players.append(player.username)
+        
+        # Remove the recent group record since it's been used
+        db.session.delete(recent_group)
+        db.session.commit()
+        
+        message = f'Rejoined {court.name} directly with {len(added_players)} player{"s" if len(added_players) != 1 else ""}: {", ".join(added_players)}'
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'court_id': court.id,
+                'group_id': empty_active_group.id,
+                'message': message,
+                'added_players': added_players,
+                'joined_court': True  # Flag to indicate direct court join
+            })
+    else:
+        # Court is occupied, join the queue as before
+        next_position = get_next_queue_position(court)
+        new_group = Group(
+            court=court,
+            is_in_queue=True,
+            queue_position=next_position
+        )
+        
+        db.session.add(new_group)
+        db.session.flush()  # Get the group ID
+        
+        # Add the current user to the group
+        user.group = new_group
+        
+        # Add all available players to the group
+        added_players = [username]
+        for player in available_players:
+            player.group = new_group
+            added_players.append(player.username)
+        
+        # Remove the recent group record since it's been used
+        db.session.delete(recent_group)
+        db.session.commit()
+        
+        message = f'Rejoined queue for {court.name} with {len(added_players)} player{"s" if len(added_players) != 1 else ""}: {", ".join(added_players)}'
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'court_id': court.id,
+                'group_id': new_group.id,
+                'message': message,
+                'added_players': added_players,
+                'joined_court': False  # Flag to indicate queue join
+            })
+    
+    flash(message, 'success')
+    return redirect(url_for('home'))
 
 @app.route('/create-empty-active-group/<int:court_id>', methods=['POST'])
 def create_empty_active_group(court_id):

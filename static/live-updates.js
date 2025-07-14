@@ -1147,3 +1147,123 @@ document.addEventListener('DOMContentLoaded', function() {
     document.body.appendChild(container);
   }
 });
+
+// Recent group rejoining
+let recentGroupsManager = {
+    checkInterval: null,
+    
+    init: function() {
+        this.loadRecentGroups();
+        // Check for recent groups every 10 seconds
+        this.checkInterval = setInterval(() => this.loadRecentGroups(), 10000);
+    },
+    
+    async loadRecentGroups() {
+        if (!window.currentUser) return;
+        
+        try {
+            const response = await fetch('/recent-groups');
+            const data = await response.json();
+            
+            if (data.recent_groups && data.recent_groups.length > 0) {
+                this.displayRecentGroups(data.recent_groups);
+                document.getElementById('recentGroupsSection').style.display = 'block';
+            } else {
+                document.getElementById('recentGroupsSection').style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error loading recent groups:', error);
+        }
+    },
+    
+    displayRecentGroups(groups) {
+        const container = document.getElementById('recentGroupsList');
+        
+        const groupsHTML = groups.map(group => `
+            <div class="recent-group-item">
+                <div class="recent-group-info">
+                    <div class="recent-group-court">${group.court_name}</div>
+                    <div class="recent-group-players">
+                        Players: ${group.players.join(', ')}
+                    </div>
+                    <div class="recent-group-time">
+                        Rotated at ${group.rotated_at} • Expires at ${group.expires_at}
+                    </div>
+                </div>
+                <button class="rejoin-group-button" onclick="recentGroupsManager.rejoinGroup(${group.id})">
+                    Rejoin Together
+                </button>
+            </div>
+        `).join('');
+        
+        container.innerHTML = groupsHTML;
+    },
+    
+    async rejoinGroup(recentGroupId) {
+        if (isProcessingRequest) {
+            console.log('Request already in progress, please wait...');
+            return;
+        }
+        
+        isProcessingRequest = true;
+        
+        // Disable all rejoin buttons
+        document.querySelectorAll('.rejoin-group-button').forEach(btn => {
+            btn.disabled = true;
+            btn.textContent = 'Rejoining...';
+        });
+        
+        try {
+            const response = await fetch(`/rejoin-with-group/${recentGroupId}`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Show different message based on whether they joined court or queue
+                const joinType = data.joined_court ? 'court' : 'queue';
+                const enhancedMessage = `${data.message} (joined ${joinType})`;
+                showFlashMessage(enhancedMessage, 'success');
+                
+                // Hide the recent groups section
+                document.getElementById('recentGroupsSection').style.display = 'none';
+                // Force court update
+                sessionStorage.setItem('forceUpdate', 'true');
+                setTimeout(() => location.reload(), 300);
+            } else {
+                showFlashMessage(data.message, 'error');
+                this.loadRecentGroups(); // Refresh the list
+            }
+        } catch (error) {
+            console.error('Error rejoining group:', error);
+            showFlashMessage('Error rejoining group', 'error');
+        } finally {
+            isProcessingRequest = false;
+            // Re-enable buttons
+            document.querySelectorAll('.rejoin-group-button').forEach(btn => {
+                btn.disabled = false;
+                btn.textContent = 'Rejoin Queue Together';
+            });
+        }
+    },
+    
+    cleanup() {
+        if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+        }
+    }
+};
+
+// Initialize recent groups manager when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.currentUser) {
+        recentGroupsManager.init();
+    }
+});
+
+// Cleanup when page unloads
+window.addEventListener('beforeunload', () => {
+    recentGroupsManager.cleanup();
+});
