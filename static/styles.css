@@ -2,6 +2,8 @@
     --system-blue: #007AFF;
     --system-red: #FF3B30;
     --system-green: #34C759;
+    --system-orange: #FF9500;
+    --system-gray: #8E8E93;
     --background-primary: #FFFFFF;
     --background-secondary: #F2F2F7;
     --text-primary: #000000;
@@ -10,6 +12,7 @@
 }
 
 :root[data-theme="dark"] {
+    --system-orange: #FF9F0A;
     --background-primary: #1C1C1E;
     --background-secondary: #2C2C2E;
     --text-primary: #FFFFFF;
@@ -1937,5 +1940,81 @@ button:disabled {
     
     .active-user-actions {
         justify-content: center;
+    }
+}
+
+/* Bulk Action Buttons */
+.active-users-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.active-users-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.bulk-action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.bulk-action-button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.bulk-action-button.activate-all {
+    background-color: var(--system-green);
+    color: white;
+}
+
+.bulk-action-button.activate-all:hover {
+    background-color: #28a745;
+}
+
+.bulk-action-button.deactivate-all {
+    background-color: var(--system-orange);
+    color: white;
+}
+
+.bulk-action-button.deactivate-all:hover {
+    background-color: #fd7e14;
+}
+
+.bulk-action-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Remove the old h3 margin since it's now in the header */
+.active-users-container h3 {
+    margin: 0;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .active-users-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+    
+    .bulk-action-buttons {
+        justify-content: center;
+    }
+    
+    .bulk-action-button {
+        flex: 1;
+        max-width: 120px;
     }
 }

@@ -181,6 +181,54 @@ def toggle_user_status():
         'message': f'User {user.username} has been {status_text}',
         'is_active': user.is_active
     })
+
+@app.route('/admin/bulk-toggle-users', methods=['POST'])
+def bulk_toggle_users():
+    """Bulk activate or deactivate all non-admin users"""
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_user = User.query.filter_by(username=session['user']).first()
+    if not current_user or not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    activate = data.get('activate', False)  # True for activate all, False for deactivate all
+    
+    # Get all non-admin users
+    users = User.query.filter_by(is_admin=False).all()
+    
+    if not users:
+        return jsonify({'success': False, 'message': 'No users found'})
+    
+    updated_count = 0
+    removed_from_groups = 0
+    
+    for user in users:
+        # Only update if the status would actually change
+        if user.is_active != activate:
+            # If deactivating a user who is currently in a group, remove them
+            if not activate and user.group:
+                user.group = None
+                removed_from_groups += 1
+            
+            user.is_active = activate
+            updated_count += 1
+    
+    db.session.commit()
+    
+    action_text = "activated" if activate else "deactivated"
+    message = f'{updated_count} user{"s" if updated_count != 1 else ""} {action_text}'
+    
+    if removed_from_groups > 0:
+        message += f' ({removed_from_groups} removed from groups)'
+    
+    return jsonify({
+        'success': True,
+        'message': message,
+        'updated_count': updated_count,
+        'removed_from_groups': removed_from_groups
+    })
 def get_user_group(user):
     """Get the group a user belongs to"""
     if isinstance(user, str):

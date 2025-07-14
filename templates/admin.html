@@ -147,11 +147,21 @@
       
       <!-- Active Users Management -->
       <div class="active-users-container">
-          <h3>Active Users</h3>
-          <div id="activeUsersList" class="active-users-list">
-              <!-- Active users will be loaded here -->
-          </div>
-      </div>
+        <div class="active-users-header">
+            <h3>Active Users</h3>
+            <div class="bulk-action-buttons">
+                <button class="bulk-action-button activate-all" onclick="bulkToggleUsers(true)">
+                    Activate All
+                </button>
+                <button class="bulk-action-button deactivate-all" onclick="bulkToggleUsers(false)">
+                    Deactivate All
+                </button>
+            </div>
+        </div>
+        <div id="activeUsersList" class="active-users-list">
+            <!-- Active users will be loaded here -->
+        </div>
+     </div>
       
       <div class="section-divider"></div>
       
@@ -599,6 +609,43 @@ const denyUser = async (userId, username) => {
     alert('Failed to deny user');
   }
 };
-
+// Add this function to your admin.html script section
+const bulkToggleUsers = async (activate) => {
+  const action = activate ? 'activate' : 'deactivate';
+  const confirmMessage = activate ? 
+    'Activate all users?' : 
+    'Deactivate all users? This will remove them from any current groups.';
+  
+  if (!confirm(confirmMessage)) return;
+  
+  // Disable the bulk action buttons during processing
+  document.querySelectorAll('.bulk-action-button').forEach(btn => {
+    btn.disabled = true;
+    btn.textContent = btn.classList.contains('activate-all') ? 'Activating...' : 'Deactivating...';
+  });
+  
+  try {
+    const response = await apiCall('/admin/bulk-toggle-users', {
+      activate: activate
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      alert(data.message);
+      loadActiveUsers(); // Refresh the list
+    } else {
+      alert('Error: ' + data.message);
+    }
+  } catch (error) {
+    console.error('Error in bulk toggle:', error);
+    alert('Failed to update user statuses');
+  } finally {
+    // Re-enable buttons
+    document.querySelectorAll('.bulk-action-button').forEach(btn => {
+      btn.disabled = false;
+      btn.textContent = btn.classList.contains('activate-all') ? 'Activate All' : 'Deactivate All';
+    });
+  }
+};
 </script>
 {% endblock %}
