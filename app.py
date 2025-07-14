@@ -78,12 +78,11 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
-    is_checked_in = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    is_checked_in = db.Column(db.Boolean, default=False) # legacy, may be removed I think
     
-    # Add the group_id foreign key to connect User to Group
     group_id = db.Column(db.Integer, db.ForeignKey('group.id'), nullable=True)
     
-    # Keep the old court_id for compatibility during transition
     court_id = db.Column(db.Integer, db.ForeignKey('court.id'), nullable=True)
 
     # Queue entry
@@ -124,6 +123,64 @@ class Group(db.Model):
             'players': [player.username for player in self.players],
             'is_full': self.is_full()
         }
+@app.route('/admin/users')
+def get_all_users():
+    """Get all active users for admin management"""
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_user = User.query.filter_by(username=session['user']).first()
+    if not current_user or not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    users = User.query.filter_by(is_admin=False).order_by(User.username).all()
+    return jsonify({
+        'success': True,
+        'users': [{
+            'id': user.id,
+            'username': user.username,
+            'is_active': user.is_active,
+            'is_in_group': user.group is not None
+        } for user in users]
+    })
+
+@app.route('/admin/toggle-user-status', methods=['POST'])
+def toggle_user_status():
+    """Toggle a user's active status"""
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_user = User.query.filter_by(username=session['user']).first()
+    if not current_user or not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    user_id = data.get('user_id')
+    
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Missing user_id'})
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'})
+    
+    if user.is_admin:
+        return jsonify({'success': False, 'message': 'Cannot modify admin users'})
+    
+    # If deactivating a user who is currently in a group, remove them
+    if user.is_active and user.group:
+        user.group = None
+    
+    # Toggle the status
+    user.is_active = not user.is_active
+    db.session.commit()
+    
+    status_text = "activated" if user.is_active else "deactivated"
+    return jsonify({
+        'success': True, 
+        'message': f'User {user.username} has been {status_text}',
+        'is_active': user.is_active
+    })
 def get_user_group(user):
     """Get the group a user belongs to"""
     if isinstance(user, str):
@@ -388,13 +445,21 @@ def logout():
 @app.route('/join-slot/<int:group_id>', methods=['POST'])
 def join_slot(group_id):
     if 'user' not in session:
-        flash('You must be logged in', 'error')
+        flash('You must be logged in to join', 'error')
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': 'You must be logged in'}), 401
+            return jsonify({'success': False, 'message': 'You must be logged in to join'})
         return redirect(url_for('login'))
-    
+
     username = session['user']
     user = User.query.filter_by(username=username).first()
+    
+    # Check if user is active
+    if not user.is_active:
+        flash('Your account is not active. Please check in with an admin.', 'error')
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Your account is not active. Please check in with an admin.'})
+        return redirect(url_for('home'))
+    
     group = Group.query.get(group_id)
     
     if not group:
@@ -1138,6 +1203,11 @@ if __name__ == '__main__':
                 db.session.add(active_group)
                 
         # Commit all changes
+
+        # for seeding, give these users active status by default
+        users_without_active_status = User.query.filter(User.is_active.is_(None)).all()
+        for user in users_without_active_status:
+            user.is_active = True
         db.session.commit()
         
     app.run(host="0.0.0.0", port=5001, debug=True)

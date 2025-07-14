@@ -141,11 +141,21 @@
 </div>
 
 
-<!-- User management for pending users -->
 <div class="admin-section">
   <div class="section-card">
       <h2 class="user-management-title">User Management</h2>
       
+      <!-- Active Users Management -->
+      <div class="active-users-container">
+          <h3>Active Users</h3>
+          <div id="activeUsersList" class="active-users-list">
+              <!-- Active users will be loaded here -->
+          </div>
+      </div>
+      
+      <div class="section-divider"></div>
+      
+      <!-- Existing Pending Users section -->
       <div class="pending-users-container">
           <h3>Pending User Approvals</h3>
           <div id="pendingUsersList" class="pending-users-list">
@@ -392,6 +402,73 @@ const adminCreateGroup = async (courtId, isQueue) => {
   }
 };
 
+// User Management functions
+const loadActiveUsers = async () => {
+  try {
+    const response = await apiCall('/admin/users');
+    const data = await response.json();
+    if (data.success) {
+      displayActiveUsers(data.users);
+    }
+  } catch (error) {
+    console.error('Error loading active users:', error);
+  }
+};
+
+const displayActiveUsers = (users) => {
+  const container = document.getElementById('activeUsersList');
+  
+  if (users.length === 0) {
+    container.innerHTML = '<div class="empty-message">No users found</div>';
+    return;
+  }
+  
+  const usersHTML = users.map(user => `
+    <div class="active-user-item ${user.is_active ? 'user-active' : 'user-inactive'}" data-user-id="${user.id}">
+      <div class="active-user-info">
+        <div class="active-user-name">${user.username}</div>
+        <div class="active-user-status">
+          Status: ${user.is_active ? 'Active' : 'Inactive'}
+          ${user.is_in_group ? ' • Currently in a group' : ''}
+        </div>
+      </div>
+      <div class="active-user-actions">
+        <button class="toggle-status-button ${user.is_active ? 'deactivate' : 'activate'}" 
+                onclick="toggleUserStatus(${user.id}, '${user.username}', ${user.is_active})">
+          ${user.is_active ? 'Deactivate' : 'Activate'}
+        </button>
+      </div>
+    </div>
+  `).join('');
+  
+  container.innerHTML = usersHTML;
+};
+
+const toggleUserStatus = async (userId, username, isCurrentlyActive) => {
+  const action = isCurrentlyActive ? 'deactivate' : 'activate';
+  // No warning message when activating or deactivating
+  // const warningMessage = isCurrentlyActive ? 
+  //  ` This will remove them from any current groups.` : '';
+  
+  // if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} user "${username}"?${warningMessage}`)) return;
+  
+  try {
+    const response = await apiCall('/admin/toggle-user-status', {
+      user_id: userId
+    });
+    const data = await response.json();
+    if (data.success) {
+      // alert(data.message);
+      loadActiveUsers(); // Refresh the list
+    } else {
+      alert('Error: ' + data.message);
+    }
+  } catch (error) {
+    console.error('Error toggling user status:', error);
+    alert('Failed to toggle user status');
+  }
+};
+
 // Initialization
 document.addEventListener('DOMContentLoaded', function() {
   // Set up admin empty slot clicks
@@ -431,6 +508,16 @@ document.addEventListener('DOMContentLoaded', function() {
   setInterval(updateTimerDisplay, 1000);
   updateClubStatus();
   setInterval(updateClubStatus, 30000);
+  
+  // Load active and pending users
+  loadActiveUsers();
+  loadPendingUsers();
+  
+  // Refresh user lists every 30 seconds
+  setInterval(() => {
+    loadActiveUsers();
+    loadPendingUsers();
+  }, 30000);
 });
 
 const loadPendingUsers = async () => {
@@ -513,15 +600,5 @@ const denyUser = async (userId, username) => {
   }
 };
 
-// Update the DOMContentLoaded section to include user management
-document.addEventListener('DOMContentLoaded', function() {
-  // ... existing code ...
-  
-  // Load pending users
-  loadPendingUsers();
-  
-  // Refresh pending users every 30 seconds
-  setInterval(loadPendingUsers, 30000);
-});
 </script>
 {% endblock %}

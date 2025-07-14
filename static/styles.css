@@ -1831,3 +1831,111 @@ button:disabled {
         justify-content: center;
     }
 }
+
+/* Active Users Management Styles */
+.active-users-container {
+    margin-bottom: 32px;
+}
+
+.active-users-container h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+}
+
+.active-users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.active-user-item {
+    background-color: var(--background-secondary);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid var(--system-gray);
+    transition: all 0.2s ease;
+}
+
+.active-user-item.user-active {
+    border-left-color: var(--system-green);
+}
+
+.active-user-item.user-inactive {
+    border-left-color: var(--system-red);
+    opacity: 0.7;
+}
+
+.active-user-info {
+    flex: 1;
+}
+
+.active-user-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.active-user-status {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.active-user-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.toggle-status-button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.toggle-status-button.activate {
+    background-color: var(--system-green);
+    color: white;
+}
+
+.toggle-status-button.activate:hover {
+    background-color: #28a745;
+}
+
+.toggle-status-button.deactivate {
+    background-color: var(--system-orange);
+    color: white;
+}
+
+.toggle-status-button.deactivate:hover {
+    background-color: #fd7e14;
+}
+
+.section-divider {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 24px 0;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .active-user-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    
+    .active-user-actions {
+        justify-content: center;
+    }
+}
