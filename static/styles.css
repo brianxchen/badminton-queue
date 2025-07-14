@@ -145,16 +145,72 @@ body {
     font-size: 16px;
 }
 
+/* Update the courts grid responsive layout */
 .courts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(4, 1fr); /* 4 columns on desktop */
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+/* Laptop/tablet breakpoint - keep 4 courts in a row for most laptops */
+@media (max-width: 1400px) and (min-width: 1024px) {
+    .courts-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px; /* Slightly smaller gap */
+    }
+    
+    .court-section {
+        padding: 20px; /* Reduce padding slightly */
+    }
+    
+    .court-section h2, .court-section h3 {
+        font-size: 18px; /* Slightly smaller headings */
+    }
+}
+
+/* Medium laptop/large tablet - still try to fit 4 but with smaller spacing */
+@media (max-width: 1024px) and (min-width: 768px) {
+    .courts-grid {
+        grid-template-columns: repeat(2, 1fr); /* 2x2 grid on medium screens */
+        gap: 16px;
+    }
+}
+
+/* Tablet portrait and smaller */
+@media (max-width: 768px) {
+    .courts-grid {
+        grid-template-columns: repeat(1, 1fr); /* Single column on mobile */
+        gap: 16px;
+    }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+    .courts-grid {
+        gap: 12px;
+    }
+    
+    .court-section {
+        padding: 16px;
+    }
 }
 
 .court-section {
     background: var(--background-primary);
     border-radius: 16px;
-    padding: 24px;
+    padding: 20px; /* Reduced from 24px */
+    min-height: 400px; /* Set a minimum height for consistency */
+}
+
+.court-section h2, .court-section h3 {
+    font-size: 20px; /* Slightly smaller */
+    margin-bottom: 16px; /* Reduced spacing */
+}
+
+.court-section h4 {
+    font-size: 16px;
+    margin-bottom: 12px;
 }
 
 button {
@@ -819,11 +875,31 @@ button:disabled {
     color: white;
 }
 
+/* Admin panel court grid - similar responsive behavior */
 .courts-admin-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr); /* Always 4 columns */
+    grid-template-columns: repeat(4, 1fr); /* 4 columns on desktop */
     gap: 16px;
     margin-bottom: 24px;
+}
+
+@media (max-width: 1400px) and (min-width: 1024px) {
+    .courts-admin-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+}
+
+@media (max-width: 1024px) and (min-width: 768px) {
+    .courts-admin-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .courts-admin-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 1200px) {
@@ -1023,8 +1099,8 @@ button:disabled {
 .player-group, .queue-group {
   background: var(--background-secondary);
   border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 12px; /* Reduced from 16px */
+  margin-bottom: 10px; /* Reduced from 12px */
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1033,9 +1109,9 @@ button:disabled {
 .player-slot {
   background: var(--background-primary);
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 8px 12px; /* Reduced from 10px 14px */
   flex: 1;
-  min-width: 120px;
+  min-width: 100px; /* Reduced from 120px */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1532,6 +1608,130 @@ button:disabled {
 
 .queue-group {
     position: relative;
-    padding-top: 8px;
-    padding-right: 8px;
+    padding: 12px; /* Reduced from 16px */
+    margin-bottom: 10px; /* Reduced from 12px */
+}
+
+/* Footer Links */
+.footer-links {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+}
+
+.footer-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.footer-link:hover {
+    color: var(--system-blue);
+    background-color: var(--background-secondary);
+}
+
+/* Technical Notes Page Styles */
+.notes-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.notes-header h1 {
+    font-size: 32px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.notes-content {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.notes-section {
+    background: var(--background-primary);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.notes-section h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+}
+
+.notes-section h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+}
+
+.notes-section p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    margin: 0 0 16px 0;
+}
+
+.notes-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.notes-section li {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    margin: 8px 0;
+    padding-left: 20px;
+    position: relative;
+}
+
+.notes-section li::before {
+    content: "•";
+    color: var(--system-blue);
+    font-weight: bold;
+    position: absolute;
+    left: 0;
+}
+
+.notes-section strong {
+    color: var(--system-blue);
+    font-weight: 600;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .notes-header {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }
+    
+    .notes-header h1 {
+        font-size: 28px;
+    }
+    
+    .notes-section {
+        padding: 20px;
+    }
 }

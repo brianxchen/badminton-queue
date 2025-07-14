@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="notes-container">
+    <div class="notes-header">
+        <h1>Technical Notes</h1>
+        <a href="{{ url_for('home') }}" class="nav-button">Back to Home</a>
+    </div>
+    
+    <div class="notes-content">
+        <div class="notes-section">
+            <p>This webapp was written using <strong>Flask</strong> (Python) for the backend, with <strong>SQLAlchemy</strong> as the ORM and <strong>PostgreSQL</strong> for the database. The frontend is built with vanilla <strong>HTML/CSS</strong> and <strong>JavaScript</strong>.</p>
+            
+            <p>Real-time updates are handled via <strong>server-sent events (SSE)</strong> with a polling fallback.</p>
+            
+        </div>
+    </div>
+</div>
+{% endblock %}
