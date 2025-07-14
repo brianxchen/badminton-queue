@@ -385,6 +385,11 @@ def signup():
         username = request.form['username']
         password = request.form['password']
         
+        # (can change) Require first and last name
+        if " " not in username:
+            flash("You must use your full (e.g. first and last) name")
+            return render_template('signup.html', error='Must use full name')
+
         # Check if username already exists in active users
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
