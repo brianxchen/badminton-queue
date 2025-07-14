@@ -1230,7 +1230,8 @@ if __name__ == '__main__':
                 user = User(
                     username=username,
                     password_hash=generate_password_hash(username),  # password same as username
-                    is_admin=False
+                    is_admin=False,
+                    is_active = False
                 )
                 db.session.add(user)
                 
