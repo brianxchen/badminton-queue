@@ -1735,3 +1735,99 @@ button:disabled {
         padding: 20px;
     }
 }
+
+/* User Management Styles */
+.user-management-title {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 24px 0;
+    color: var(--text-primary);
+}
+
+.pending-users-container h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    color: var(--text-primary);
+}
+
+.pending-users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pending-user-item {
+    background-color: var(--background-secondary);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 4px solid var(--system-orange);
+}
+
+.pending-user-info {
+    flex: 1;
+}
+
+.pending-user-name {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.pending-user-date {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.pending-user-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.approve-button {
+    background-color: var(--system-green);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.approve-button:hover {
+    background-color: #28a745;
+}
+
+.deny-button {
+    background-color: var(--system-red);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.deny-button:hover {
+    background-color: #dc3545;
+}
+
+@media (max-width: 768px) {
+    .pending-user-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    
+    .pending-user-actions {
+        justify-content: center;
+    }
+}

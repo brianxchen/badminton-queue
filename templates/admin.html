@@ -140,7 +140,20 @@
     </div>
 </div>
 
-<!-- Add a player selection modal -->
+
+<!-- User management for pending users -->
+<div class="admin-section">
+  <div class="section-card">
+      <h2 class="user-management-title">User Management</h2>
+      
+      <div class="pending-users-container">
+          <h3>Pending User Approvals</h3>
+          <div id="pendingUsersList" class="pending-users-list">
+              <!-- Pending users will be loaded here -->
+          </div>
+      </div>
+  </div>
+</div>
 <div id="adminAddPlayerModal" class="admin-modal">
     <div class="admin-modal-content">
         <span class="admin-modal-close" onclick="closeAddPlayerModal()">&times;</span>
@@ -418,6 +431,97 @@ document.addEventListener('DOMContentLoaded', function() {
   setInterval(updateTimerDisplay, 1000);
   updateClubStatus();
   setInterval(updateClubStatus, 30000);
+});
+
+const loadPendingUsers = async () => {
+  try {
+    const response = await apiCall('/admin/pending-users');
+    const data = await response.json();
+    if (data.success) {
+      displayPendingUsers(data.pending_users);
+    }
+  } catch (error) {
+    console.error('Error loading pending users:', error);
+  }
+};
+
+const displayPendingUsers = (pendingUsers) => {
+  const container = document.getElementById('pendingUsersList');
+  
+  if (pendingUsers.length === 0) {
+    container.innerHTML = '<div class="empty-message">No pending user approvals</div>';
+    return;
+  }
+  
+  const usersHTML = pendingUsers.map(user => `
+    <div class="pending-user-item" data-user-id="${user.id}">
+      <div class="pending-user-info">
+        <div class="pending-user-name">${user.username}</div>
+        <div class="pending-user-date">Requested: ${user.created_at}</div>
+      </div>
+      <div class="pending-user-actions">
+        <button class="approve-button" onclick="approveUser(${user.id}, '${user.username}')">
+          Approve
+        </button>
+        <button class="deny-button" onclick="denyUser(${user.id}, '${user.username}')">
+          Deny
+        </button>
+      </div>
+    </div>
+  `).join('');
+  
+  container.innerHTML = usersHTML;
+};
+
+const approveUser = async (userId, username) => {
+  if (!confirm(`Approve user "${username}"?`)) return;
+  
+  try {
+    const response = await apiCall('/admin/approve-user', {
+      pending_user_id: userId
+    });
+    const data = await response.json();
+    if (data.success) {
+      alert(data.message);
+      loadPendingUsers(); // Refresh the list
+    } else {
+      alert('Error: ' + data.message);
+    }
+  } catch (error) {
+    console.error('Error approving user:', error);
+    alert('Failed to approve user');
+  }
+};
+
+const denyUser = async (userId, username) => {
+  if (!confirm(`Deny user request for "${username}"? This cannot be undone.`)) return;
+  
+  try {
+    const response = await apiCall('/admin/deny-user', {
+      pending_user_id: userId
+    });
+    const data = await response.json();
+    if (data.success) {
+      alert(data.message);
+      loadPendingUsers(); // Refresh the list
+    } else {
+      alert('Error: ' + data.message);
+    }
+  } catch (error) {
+    console.error('Error denying user:', error);
+    alert('Failed to deny user');
+  }
+};
+
+// Update the DOMContentLoaded section to include user management
+document.addEventListener('DOMContentLoaded', function() {
+  // ... existing code ...
+  
+  // Load pending users
+  loadPendingUsers();
+  
+  // Refresh pending users every 30 seconds
+  setInterval(loadPendingUsers, 30000);
 });
 </script>
 {% endblock %}

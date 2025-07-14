@@ -89,6 +89,18 @@ class User(db.Model):
     # Queue entry
     queue_entry = db.relationship('QueueEntry', back_populates='user', uselist=False)
 
+class PendingUser(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
 class Group(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     court_id = db.Column(db.Integer, db.ForeignKey('court.id'), nullable=True)
@@ -268,20 +280,106 @@ def signup():
         username = request.form['username']
         password = request.form['password']
         
-        # Check if username already exists
+        # Check if username already exists in active users
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
             flash('Username already exists', 'error')
             return render_template('signup.html', error='Username already exists')
+            
+        # Check if username already exists in pending users
+        existing_pending = PendingUser.query.filter_by(username=username).first()
+        if existing_pending:
+            flash('Username is already pending approval', 'error')
+            return render_template('signup.html', error='Username is already pending approval')
+        
         password_hash = generate_password_hash(password)
-        new_user = User(username=username, password_hash=password_hash, is_admin=False)
-        db.session.add(new_user)
+        pending_user = PendingUser(username=username, password_hash=password_hash)
+        db.session.add(pending_user)
         db.session.commit()
 
-        flash('User created successfully! Please log in.', 'success')
+        flash('Account submitted for approval! An admin will review your request.', 'info')
         return redirect(url_for('login'))
     return render_template('signup.html')
+@app.route('/admin/pending-users')
+def get_pending_users():
+    """Get all pending users for admin approval"""
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_user = User.query.filter_by(username=session['user']).first()
+    if not current_user or not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    pending_users = PendingUser.query.order_by(PendingUser.created_at.desc()).all()
+    return jsonify({
+        'success': True,
+        'pending_users': [user.to_dict() for user in pending_users]
+    })
 
+@app.route('/admin/approve-user', methods=['POST'])
+def approve_user():
+    """Approve a pending user and create their account"""
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_user = User.query.filter_by(username=session['user']).first()
+    if not current_user or not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    pending_user_id = data.get('pending_user_id')
+    
+    if not pending_user_id:
+        return jsonify({'success': False, 'message': 'Missing pending_user_id'})
+    
+    pending_user = PendingUser.query.get(pending_user_id)
+    if not pending_user:
+        return jsonify({'success': False, 'message': 'Pending user not found'})
+    
+    # Check if username is still available
+    existing_user = User.query.filter_by(username=pending_user.username).first()
+    if existing_user:
+        return jsonify({'success': False, 'message': 'Username is no longer available'})
+    
+    # Create the actual user account
+    new_user = User(
+        username=pending_user.username,
+        password_hash=pending_user.password_hash,
+        is_admin=False
+    )
+    db.session.add(new_user)
+    
+    # Remove from pending users
+    db.session.delete(pending_user)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': f'User {new_user.username} approved successfully'})
+
+@app.route('/admin/deny-user', methods=['POST'])
+def deny_user():
+    """Deny a pending user and remove their request"""
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    current_user = User.query.filter_by(username=session['user']).first()
+    if not current_user or not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    pending_user_id = data.get('pending_user_id')
+    
+    if not pending_user_id:
+        return jsonify({'success': False, 'message': 'Missing pending_user_id'})
+    
+    pending_user = PendingUser.query.get(pending_user_id)
+    if not pending_user:
+        return jsonify({'success': False, 'message': 'Pending user not found'})
+    
+    username = pending_user.username
+    db.session.delete(pending_user)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': f'User request for {username} denied'})
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():
     session.clear()
@@ -877,7 +975,7 @@ def technical_notes():
 @app.route('/faq')
 def faq():
     return render_template('faq.html')
-    
+
 @app.route('/club-status')
 def get_club_status():
     club_state = ClubState.query.first()
@@ -980,6 +1078,7 @@ def court_updates_poll():
     
     return jsonify(response_data)
 
+# Main for testing locally. Seeds all databases
 if __name__ == '__main__':
     with app.app_context():
         db.drop_all()
