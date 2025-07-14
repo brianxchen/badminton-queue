@@ -28,6 +28,14 @@ db = SQLAlchemy(app)
 
 EST = timezone(timedelta(hours=-5))  # EST is UTC-5
 
+def get_eastern_timezone():
+    """Get the current Eastern timezone (EST or EDT) based on the current date"""
+    # Check if we're currently in daylight saving time
+    if time.daylight and time.localtime().tm_isdst:
+        return timezone(timedelta(hours=-4))  # EDT
+    else:
+        return timezone(timedelta(hours=-5))  # EST
+
 class Court(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), unique=True, nullable=False)
@@ -136,17 +144,17 @@ class RecentGroup(db.Model):
     court = db.relationship('Court')
     
     def to_dict(self):
-        # Convert UTC to EST for display
-        rotated_at_est = self.rotated_at.replace(tzinfo=timezone.utc).astimezone(EST)
-        expires_at_est = self.expires_at.replace(tzinfo=timezone.utc).astimezone(EST)
+        eastern_tz = get_eastern_timezone()
+        rotated_at_eastern = self.rotated_at.replace(tzinfo=timezone.utc).astimezone(eastern_tz)
+        expires_at_eastern = self.expires_at.replace(tzinfo=timezone.utc).astimezone(eastern_tz)
         
         return {
             'id': self.id,
             'court_id': self.court_id,
             'court_name': self.court.name,
             'players': json.loads(self.player_usernames),
-            'rotated_at': rotated_at_est.strftime('%H:%M:%S'),
-            'expires_at': expires_at_est.strftime('%H:%M:%S')
+            'rotated_at': rotated_at_eastern.strftime(f'%H:%M:%S'),
+            'expires_at': expires_at_eastern.strftime(f'%H:%M:%S')
         }
 @app.route('/admin/users')
 def get_all_users():
